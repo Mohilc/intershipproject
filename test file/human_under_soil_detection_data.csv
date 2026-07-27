@@ -1,0 +1,101 @@
+scan_id,human_under_soil,detection_category,subject_type,vital_signs_status,depth_meters,respiration_rate_bpm,thermal_anomaly_deg_c,gpr_radar_signal_notes,grid_x_m,grid_y_m
+SCAN-2026-001,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.3,21.5,3.18,Micro-Doppler respiration peak detected,5.06,14.29
+SCAN-2026-002,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),3.1,13.6,1.63,Micro-Doppler respiration peak detected,16.03,16.82
+SCAN-2026-003,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,3.41,12.2,0.82,Low-frequency acoustic vibration,26.44,28.3
+SCAN-2026-004,True,Skeletal Remains Detected,Human Remains,None,1.14,0.0,0.0,Hyperbolic skeletal reflection pattern,22.48,12.2
+SCAN-2026-005,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.07,13.8,2.2,Micro-Doppler respiration peak detected,21.21,28.87
+SCAN-2026-006,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),0.92,14.9,2.91,Micro-Doppler respiration peak detected,21.37,27.26
+SCAN-2026-007,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.86,15.7,2.55,Micro-Doppler respiration peak detected,11.43,6.68
+SCAN-2026-008,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),0.64,17.1,2.86,Micro-Doppler respiration peak detected,9.51,3.01
+SCAN-2026-009,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,3.35,9.0,0.88,Low-frequency acoustic vibration,24.47,3.92
+SCAN-2026-010,True,Skeletal Remains Detected,Human Remains,None,2.93,0.0,0.0,Hyperbolic skeletal reflection pattern,24.49,1.53
+SCAN-2026-011,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.82,13.0,3.07,Micro-Doppler respiration peak detected,26.15,3.74
+SCAN-2026-012,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),3.23,17.0,1.58,Micro-Doppler respiration peak detected,27.48,20.81
+SCAN-2026-013,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.06,18.6,2.22,Micro-Doppler respiration peak detected,15.83,3.06
+SCAN-2026-014,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,2.83,9.1,1.96,Low-frequency acoustic vibration,15.54,10.25
+SCAN-2026-015,True,Skeletal Remains Detected,Human Remains,None,3.18,0.0,0.0,Hyperbolic skeletal reflection pattern,24.15,25.5
+SCAN-2026-016,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,1.09,13.5,0.91,Low-frequency acoustic vibration,19.85,1.67
+SCAN-2026-017,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.31,15.3,2.39,Micro-Doppler respiration peak detected,21.36,24.62
+SCAN-2026-018,True,Skeletal Remains Detected,Human Remains,None,1.57,0.0,0.0,Hyperbolic skeletal reflection pattern,24.08,9.17
+SCAN-2026-019,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.91,17.4,1.82,Micro-Doppler respiration peak detected,26.81,4.43
+SCAN-2026-020,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.1,21.9,3.28,Micro-Doppler respiration peak detected,10.8,21.21
+SCAN-2026-021,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.69,20.2,3.13,Micro-Doppler respiration peak detected,11.89,19.24
+SCAN-2026-022,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,0.85,8.4,1.23,Low-frequency acoustic vibration,3.73,26.45
+SCAN-2026-023,True,Skeletal Remains Detected,Human Remains,None,2.37,0.0,0.0,Hyperbolic skeletal reflection pattern,17.77,22.32
+SCAN-2026-024,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.48,12.6,2.22,Micro-Doppler respiration peak detected,2.04,24.3
+SCAN-2026-025,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,1.92,11.8,1.86,Low-frequency acoustic vibration,14.5,9.18
+SCAN-2026-026,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.18,19.1,3.25,Micro-Doppler respiration peak detected,16.74,6.15
+SCAN-2026-027,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,1.78,11.0,1.43,Low-frequency acoustic vibration,9.31,22.77
+SCAN-2026-028,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.41,13.1,1.57,Micro-Doppler respiration peak detected,18.13,24.4
+SCAN-2026-029,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.25,17.1,3.59,Micro-Doppler respiration peak detected,1.88,29.72
+SCAN-2026-030,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),0.73,19.6,2.03,Micro-Doppler respiration peak detected,2.08,12.97
+SCAN-2026-031,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),2.92,13.6,3.64,Micro-Doppler respiration peak detected,24.86,11.79
+SCAN-2026-032,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,1.06,13.2,1.76,Low-frequency acoustic vibration,11.45,23.52
+SCAN-2026-033,True,Skeletal Remains Detected,Human Remains,None,2.12,0.0,0.0,Hyperbolic skeletal reflection pattern,4.68,10.88
+SCAN-2026-034,True,Skeletal Remains Detected,Human Remains,None,3.19,0.0,0.0,Hyperbolic skeletal reflection pattern,16.15,27.99
+SCAN-2026-035,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.78,13.1,2.02,Micro-Doppler respiration peak detected,23.33,25.89
+SCAN-2026-036,True,Skeletal Remains Detected,Human Remains,None,3.08,0.0,0.0,Hyperbolic skeletal reflection pattern,7.26,13.44
+SCAN-2026-037,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.17,17.1,2.46,Micro-Doppler respiration peak detected,19.06,22.78
+SCAN-2026-038,True,Live Human Trapped,Trapped Individual,Active (Breathing / Motion),1.47,15.4,3.67,Micro-Doppler respiration peak detected,3.48,22.88
+SCAN-2026-039,True,Thermal/Acoustic Human Signature Detected,Human Signature,Weak / Intermittent,3.42,12.2,1.24,Low-frequency acoustic vibration,2.5,3.99
+SCAN-2026-040,True,Skeletal Remains Detected,Human Remains,None,1.26,0.0,0.0,Hyperbolic skeletal reflection pattern,16.41,27.17
+SCAN-2026-041,False,Clear Soil (No Human),None,None,1.85,0.0,0.0,Baseline soil background signature,16.68,15.65
+SCAN-2026-042,False,Clear Soil (No Human),None,None,0.67,0.0,0.0,Baseline soil background signature,19.49,24.97
+SCAN-2026-043,False,Dense Root System,None,None,2.76,0.0,0.0,Baseline soil background signature,22.06,10.28
+SCAN-2026-044,False,Clear Soil (No Human),None,None,1.75,0.0,0.0,Baseline soil background signature,29.3,26.97
+SCAN-2026-045,False,Subsurface Cavity/Void,None,None,1.58,0.0,0.0,Baseline soil background signature,15.97,12.29
+SCAN-2026-046,False,Clear Soil (No Human),None,None,2.7,0.0,0.0,Baseline soil background signature,10.37,1.31
+SCAN-2026-047,False,Subsurface Cavity/Void,None,None,1.59,0.0,0.0,Baseline soil background signature,24.06,27.26
+SCAN-2026-048,False,Dense Root System,None,None,3.93,0.0,0.0,Baseline soil background signature,8.85,3.65
+SCAN-2026-049,False,Clear Soil (No Human),None,None,3.78,0.0,0.0,Baseline soil background signature,13.73,10.26
+SCAN-2026-050,False,Clear Soil (No Human),None,None,3.35,0.0,0.0,Baseline soil background signature,3.28,28.55
+SCAN-2026-051,False,Dense Root System,None,None,2.91,0.0,0.0,Baseline soil background signature,1.74,28.57
+SCAN-2026-052,False,Clear Soil (No Human),None,None,4.26,0.0,0.0,Baseline soil background signature,28.92,17.63
+SCAN-2026-053,False,Clear Soil (No Human),None,None,1.34,0.0,0.0,Baseline soil background signature,25.24,19.32
+SCAN-2026-054,False,Clear Soil (No Human),None,None,3.16,0.0,0.0,Baseline soil background signature,21.18,14.0
+SCAN-2026-055,False,Dense Root System,None,None,0.57,0.0,0.0,Baseline soil background signature,12.86,9.5
+SCAN-2026-056,False,Clear Soil (No Human),None,None,1.52,0.0,0.0,Baseline soil background signature,6.03,10.53
+SCAN-2026-057,False,Dense Root System,None,None,1.28,0.0,0.0,Baseline soil background signature,5.54,20.5
+SCAN-2026-058,False,Dense Root System,None,None,2.24,0.0,0.0,Baseline soil background signature,8.26,22.82
+SCAN-2026-059,False,Subsurface Cavity/Void,None,None,1.12,0.0,0.0,Baseline soil background signature,16.93,23.96
+SCAN-2026-060,False,Clear Soil (No Human),None,None,1.01,0.0,0.0,Baseline soil background signature,21.72,23.9
+SCAN-2026-061,False,Subsurface Cavity/Void,None,None,4.45,0.0,0.0,Baseline soil background signature,20.15,3.64
+SCAN-2026-062,False,Clear Soil (No Human),None,None,3.47,0.0,0.0,Baseline soil background signature,9.12,15.34
+SCAN-2026-063,False,Dense Root System,None,None,3.0,0.0,0.0,Baseline soil background signature,28.69,2.67
+SCAN-2026-064,False,Clear Soil (No Human),None,None,1.59,0.0,0.0,Baseline soil background signature,22.4,16.94
+SCAN-2026-065,False,Clear Soil (No Human),None,None,4.54,0.0,0.0,Baseline soil background signature,17.08,13.8
+SCAN-2026-066,False,Subsurface Cavity/Void,None,None,3.35,0.0,0.0,Baseline soil background signature,18.74,26.74
+SCAN-2026-067,False,Clear Soil (No Human),None,None,2.07,0.0,0.0,Baseline soil background signature,13.17,11.18
+SCAN-2026-068,False,Dense Root System,None,None,4.54,0.0,0.0,Baseline soil background signature,8.18,4.39
+SCAN-2026-069,False,Subsurface Cavity/Void,None,None,4.01,0.0,0.0,Baseline soil background signature,11.32,5.15
+SCAN-2026-070,False,Dense Root System,None,None,0.88,0.0,0.0,Baseline soil background signature,22.98,23.08
+SCAN-2026-071,False,Clear Soil (No Human),None,None,4.54,0.0,0.0,Baseline soil background signature,1.42,18.93
+SCAN-2026-072,False,Dense Root System,None,None,0.54,0.0,0.0,Baseline soil background signature,4.37,3.93
+SCAN-2026-073,False,Clear Soil (No Human),None,None,3.49,0.0,0.0,Baseline soil background signature,2.33,3.44
+SCAN-2026-074,False,Clear Soil (No Human),None,None,1.22,0.0,0.0,Baseline soil background signature,2.18,21.33
+SCAN-2026-075,False,Clear Soil (No Human),None,None,3.61,0.0,0.0,Baseline soil background signature,25.81,3.11
+SCAN-2026-076,False,Dense Root System,None,None,1.51,0.0,0.0,Baseline soil background signature,21.41,24.83
+SCAN-2026-077,False,Dense Root System,None,None,1.57,0.0,0.0,Baseline soil background signature,14.75,21.48
+SCAN-2026-078,False,Clear Soil (No Human),None,None,3.86,0.0,0.0,Baseline soil background signature,3.84,3.36
+SCAN-2026-079,False,Dense Root System,None,None,4.32,0.0,0.0,Baseline soil background signature,15.26,3.46
+SCAN-2026-080,False,Dense Root System,None,None,3.06,0.0,0.0,Baseline soil background signature,14.73,29.61
+SCAN-2026-081,False,Clear Soil (No Human),None,None,2.15,0.0,0.0,Baseline soil background signature,6.02,11.85
+SCAN-2026-082,False,Clear Soil (No Human),None,None,1.6,0.0,0.0,Baseline soil background signature,13.58,11.75
+SCAN-2026-083,False,Subsurface Cavity/Void,None,None,2.27,0.0,0.0,Baseline soil background signature,12.56,24.57
+SCAN-2026-084,False,Subsurface Cavity/Void,None,None,3.34,0.0,0.0,Baseline soil background signature,18.86,28.47
+SCAN-2026-085,False,Dense Root System,None,None,2.76,0.0,0.0,Baseline soil background signature,19.42,29.59
+SCAN-2026-086,False,Clear Soil (No Human),None,None,2.72,0.0,0.0,Baseline soil background signature,2.31,22.85
+SCAN-2026-087,False,Clear Soil (No Human),None,None,3.75,0.0,0.0,Baseline soil background signature,11.86,11.91
+SCAN-2026-088,False,Clear Soil (No Human),None,None,0.61,0.0,0.0,Baseline soil background signature,19.15,3.42
+SCAN-2026-089,False,Dense Root System,None,None,1.3,0.0,0.0,Baseline soil background signature,15.59,23.54
+SCAN-2026-090,False,Subsurface Cavity/Void,None,None,4.79,0.0,0.0,Baseline soil background signature,25.84,17.19
+SCAN-2026-091,False,Subsurface Cavity/Void,None,None,2.17,0.0,0.0,Baseline soil background signature,20.1,13.3
+SCAN-2026-092,False,Clear Soil (No Human),None,None,4.68,0.0,0.0,Baseline soil background signature,5.73,27.28
+SCAN-2026-093,False,Clear Soil (No Human),None,None,4.85,0.0,0.0,Baseline soil background signature,3.05,4.22
+SCAN-2026-094,False,Subsurface Cavity/Void,None,None,4.34,0.0,0.0,Baseline soil background signature,19.63,15.29
+SCAN-2026-095,False,Clear Soil (No Human),None,None,2.23,0.0,0.0,Baseline soil background signature,1.77,1.33
+SCAN-2026-096,False,Subsurface Cavity/Void,None,None,1.93,0.0,0.0,Baseline soil background signature,17.99,14.59
+SCAN-2026-097,False,Clear Soil (No Human),None,None,3.01,0.0,0.0,Baseline soil background signature,28.27,2.63
+SCAN-2026-098,False,Subsurface Cavity/Void,None,None,3.63,0.0,0.0,Baseline soil background signature,17.69,4.45
+SCAN-2026-099,False,Clear Soil (No Human),None,None,0.94,0.0,0.0,Baseline soil background signature,12.26,4.41
+SCAN-2026-100,False,Dense Root System,None,None,4.96,0.0,0.0,Baseline soil background signature,19.66,19.83

@@ -1,0 +1,151 @@
+sample_id,grid_x_m,grid_y_m,depth_cm,soil_type,soil_ph,moisture_percent,organic_matter_percent,nitrogen_ppm,phosphorus_ppm,gpr_dielectric_constant,gpr_reflection_amplitude_db,thermal_conductivity_w_mk,anomaly_detected,anomaly_classification,notes
+SUB-2026-001,18.73,45.41,31.9,Sandy Clay,7.35,15.5,2.96,76.2,36.1,16.14,-21.8,0.85,False,Baseline Soil,Standard background soil composition
+SUB-2026-002,47.54,11.98,142.2,Humus-rich Clay,5.09,40.2,1.69,52.0,8.9,12.1,-23.2,1.22,False,Baseline Soil,Standard background soil composition
+SUB-2026-003,36.6,7.24,144.3,Clay Loam,5.55,30.8,2.77,80.7,8.8,10.14,-39.1,1.17,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-004,29.93,24.47,166.6,Silt Loam,4.87,22.0,5.58,70.9,20.0,14.15,-28.1,1.3,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-005,7.8,49.28,187.0,Silt Loam,6.28,16.2,4.45,84.9,26.1,10.81,-26.7,0.92,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-006,7.8,12.1,244.4,Clay Loam,7.07,35.8,7.75,39.5,36.5,16.23,-26.0,2.11,False,Baseline Soil,Standard background soil composition
+SUB-2026-007,2.9,33.61,138.7,Clay Loam,7.7,30.6,7.22,68.7,33.3,16.61,-19.7,1.58,False,Baseline Soil,Standard background soil composition
+SUB-2026-008,43.31,38.08,94.3,Sandy Clay,6.56,28.0,3.89,43.1,24.5,9.9,-21.3,1.23,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-009,30.06,11.88,202.9,Sandy Clay,7.8,38.8,3.32,48.6,18.1,7.88,-18.7,1.36,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-010,35.4,36.41,82.3,Silt Loam,5.4,35.7,4.16,58.9,44.9,12.29,-13.2,1.43,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-011,1.03,18.39,121.0,Humus-rich Clay,5.14,16.6,5.63,76.2,23.8,16.77,-11.5,1.64,False,Baseline Soil,Standard background soil composition
+SUB-2026-012,48.5,31.62,38.0,Silt Loam,6.46,21.4,3.38,83.9,24.7,6.95,-14.9,1.52,False,Baseline Soil,Standard background soil composition
+SUB-2026-013,41.62,31.68,25.8,Humus-rich Clay,6.81,19.5,5.87,68.8,14.1,12.72,-6.6,2.09,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-014,10.62,26.79,241.4,Humus-rich Clay,6.47,34.3,4.37,44.2,37.4,12.84,-39.4,1.5,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-015,9.09,4.51,212.3,Sandy Clay,4.85,13.0,5.36,44.5,33.7,14.26,-33.1,2.19,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-016,9.17,41.77,180.1,Sandy Loam,6.43,29.1,4.55,66.6,16.2,5.84,-39.7,1.99,False,Baseline Soil,Standard background soil composition
+SUB-2026-017,15.21,16.04,114.1,Sandy Loam,5.46,34.9,3.56,31.7,11.0,14.02,-17.3,1.09,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-018,26.24,9.33,59.9,Clay Loam,7.04,38.3,8.14,22.7,33.2,16.73,-8.6,2.1,False,Baseline Soil,Standard background soil composition
+SUB-2026-019,21.6,2.04,56.0,Sandy Clay,6.79,22.3,6.85,39.8,32.2,6.52,-31.5,0.96,False,Baseline Soil,Standard background soil composition
+SUB-2026-020,14.56,29.54,77.6,Humus-rich Clay,5.75,36.6,2.48,35.1,18.1,7.33,-7.6,1.94,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-021,30.59,33.88,146.3,Sandy Loam,6.09,15.3,7.58,35.7,43.2,17.6,-37.9,1.33,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-022,6.97,0.83,184.4,Humus-rich Clay,5.65,37.4,4.91,31.4,13.6,6.53,-7.3,2.03,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-023,14.61,25.6,171.8,Sandy Loam,6.45,15.8,7.76,17.9,24.0,15.96,-27.7,2.02,False,Baseline Soil,Standard background soil composition
+SUB-2026-024,18.32,11.32,84.4,Sandy Loam,7.26,23.9,7.1,16.3,42.9,10.89,-36.5,1.93,False,Baseline Soil,Standard background soil composition
+SUB-2026-025,22.8,32.26,239.6,Sandy Loam,5.71,35.9,4.48,84.1,23.5,7.46,-23.0,1.91,False,Baseline Soil,Standard background soil composition
+SUB-2026-026,39.26,8.72,189.7,Sandy Clay,6.9,16.5,1.66,44.9,31.6,16.19,-31.0,1.23,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-027,9.98,34.55,147.5,Silt Loam,6.08,18.9,3.38,41.9,22.7,10.23,-30.0,0.91,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-028,25.71,19.34,160.7,Humus-rich Clay,5.87,33.7,5.29,62.6,18.1,11.21,-29.2,1.36,False,Baseline Soil,Standard background soil composition
+SUB-2026-029,29.62,46.84,116.5,Sandy Clay,6.41,33.6,5.93,30.3,44.4,9.03,-11.9,1.04,False,Baseline Soil,Standard background soil composition
+SUB-2026-030,2.32,6.88,77.0,Sandy Clay,5.67,31.2,3.31,81.5,23.1,12.3,-21.1,1.77,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-031,30.38,17.05,101.9,Sandy Clay,6.06,32.8,2.48,70.0,41.1,6.29,-29.1,1.28,False,Baseline Soil,Standard background soil composition
+SUB-2026-032,8.53,5.67,194.3,Sandy Clay,5.54,28.3,7.34,21.3,16.5,9.48,-18.6,2.17,False,Baseline Soil,Standard background soil composition
+SUB-2026-033,3.25,46.23,23.3,Sandy Clay,8.07,19.6,8.39,44.2,15.9,17.57,-14.9,1.7,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-034,47.44,43.87,46.7,Clay Loam,6.53,22.4,5.18,76.5,9.2,7.61,-30.5,1.95,False,Baseline Soil,Standard background soil composition
+SUB-2026-035,48.28,12.9,30.6,Humus-rich Clay,5.94,17.4,2.7,81.1,32.1,13.19,-25.5,0.99,False,Baseline Soil,Standard background soil composition
+SUB-2026-036,40.42,33.0,29.4,Sandy Clay,6.67,39.3,3.41,47.7,21.6,8.55,-35.7,2.01,False,Baseline Soil,Standard background soil composition
+SUB-2026-037,15.23,40.86,216.8,Humus-rich Clay,6.41,29.5,1.63,57.9,40.0,14.83,-33.7,2.09,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-038,4.88,27.76,181.8,Clay Loam,6.32,24.0,7.9,26.7,25.5,5.83,-16.2,1.48,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-039,34.21,26.48,129.1,Clay Loam,6.99,25.9,2.32,84.4,43.8,17.58,-33.6,1.65,False,Baseline Soil,Standard background soil composition
+SUB-2026-040,22.01,12.09,42.5,Humus-rich Clay,7.11,40.4,5.54,31.2,14.9,10.35,-21.6,1.87,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-041,6.1,4.66,133.1,Sandy Loam,6.08,16.6,3.42,81.0,40.1,7.3,-15.2,1.04,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-042,24.76,44.86,128.9,Silt Loam,6.04,29.6,5.38,60.5,36.7,5.03,-36.3,1.5,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-043,1.72,45.02,59.8,Sandy Loam,6.28,27.2,6.06,57.5,36.5,6.38,-20.1,1.36,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-044,45.47,31.66,119.8,Sandy Loam,4.66,30.3,7.31,50.9,39.3,11.28,-31.0,1.0,False,Baseline Soil,Standard background soil composition
+SUB-2026-045,12.94,16.95,111.7,Sandy Loam,5.29,12.5,2.94,31.1,36.2,8.72,-6.3,1.31,False,Baseline Soil,Standard background soil composition
+SUB-2026-046,33.13,17.46,161.6,Sandy Clay,7.59,38.2,1.58,27.4,31.2,15.6,-23.1,0.9,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-047,15.59,36.3,166.1,Clay Loam,7.82,40.0,2.46,30.4,12.9,10.03,-11.8,0.84,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-048,26.0,44.86,30.4,Sandy Loam,6.3,29.0,7.8,28.1,9.2,7.48,-20.7,0.99,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-049,27.34,44.35,106.2,Clay Loam,6.96,32.9,7.62,69.6,42.1,12.64,-38.5,2.15,False,Baseline Soil,Standard background soil composition
+SUB-2026-050,9.24,38.99,163.9,Humus-rich Clay,6.75,39.7,5.68,39.5,30.8,13.89,-17.8,1.57,False,Baseline Soil,Standard background soil composition
+SUB-2026-051,48.48,32.1,135.7,Silt Loam,8.5,33.2,5.7,19.0,37.5,6.34,-6.7,2.15,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-052,38.76,4.21,217.0,Humus-rich Clay,7.4,16.6,6.16,82.8,25.8,6.35,-18.9,1.41,False,Baseline Soil,Standard background soil composition
+SUB-2026-053,46.97,8.08,171.5,Humus-rich Clay,6.4,29.3,2.73,76.9,12.3,4.51,-11.3,1.24,False,Baseline Soil,Standard background soil composition
+SUB-2026-054,44.74,44.93,57.5,Sandy Clay,5.74,30.2,7.9,79.9,12.6,14.31,-9.1,1.51,False,Baseline Soil,Standard background soil composition
+SUB-2026-055,29.89,30.32,36.2,Silt Loam,5.21,24.7,4.43,84.6,33.4,13.29,-32.0,1.42,False,Baseline Soil,Standard background soil composition
+SUB-2026-056,46.09,0.46,167.8,Humus-rich Clay,6.66,34.1,4.18,27.2,23.9,10.64,-32.6,0.95,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-057,4.42,5.07,26.1,Humus-rich Clay,5.89,40.0,5.13,42.7,15.4,15.82,-18.6,1.7,False,Baseline Soil,Standard background soil composition
+SUB-2026-058,9.8,33.18,154.7,Silt Loam,5.36,39.8,1.83,68.1,26.2,15.28,-25.6,1.1,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-059,2.26,0.25,236.3,Silt Loam,5.98,25.5,2.66,63.7,10.4,12.19,-10.6,1.67,False,Baseline Soil,Standard background soil composition
+SUB-2026-060,16.27,8.04,152.4,Humus-rich Clay,5.63,15.4,6.67,25.8,29.5,16.16,-8.5,1.71,False,Baseline Soil,Standard background soil composition
+SUB-2026-061,19.43,27.44,109.3,Silt Loam,7.85,41.5,2.08,72.1,18.0,6.88,-27.6,1.01,False,Baseline Soil,Standard background soil composition
+SUB-2026-062,13.57,34.59,168.0,Humus-rich Clay,7.21,37.2,5.72,30.7,37.5,5.57,-31.7,0.89,False,Baseline Soil,Standard background soil composition
+SUB-2026-063,41.44,32.6,125.4,Humus-rich Clay,6.49,15.7,3.22,30.7,19.5,7.78,-12.7,1.89,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-064,17.84,11.21,145.5,Sandy Clay,7.68,39.6,4.23,52.6,24.8,4.8,-30.4,1.44,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-065,14.05,35.61,236.5,Sandy Loam,6.56,38.1,3.52,56.5,8.4,11.44,-11.2,0.88,False,Baseline Soil,Standard background soil composition
+SUB-2026-066,27.13,11.86,108.8,Humus-rich Clay,5.81,27.6,3.99,55.6,10.7,17.11,-25.2,2.19,False,Baseline Soil,Standard background soil composition
+SUB-2026-067,7.05,16.27,241.1,Clay Loam,7.72,29.7,6.53,21.4,22.5,4.55,-16.6,0.88,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-068,40.11,37.32,228.2,Sandy Loam,6.93,24.0,3.58,76.4,25.8,5.71,-36.7,1.77,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-069,3.73,32.48,65.0,Sandy Loam,5.67,13.6,5.46,33.6,30.2,10.33,-18.2,2.18,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-070,49.34,42.46,36.0,Sandy Loam,6.35,22.1,4.83,24.1,18.8,17.07,-24.2,1.13,False,Baseline Soil,Standard background soil composition
+SUB-2026-071,38.61,32.88,43.2,Sandy Clay,5.8,36.1,6.15,77.2,33.7,8.43,-19.5,1.0,False,Baseline Soil,Standard background soil composition
+SUB-2026-072,9.94,28.42,24.2,Humus-rich Clay,5.39,12.1,8.06,81.9,39.8,11.1,-34.1,0.97,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-073,0.28,4.68,41.7,Sandy Clay,7.24,22.0,6.63,75.3,36.9,4.58,-14.2,1.22,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-074,40.77,18.39,177.1,Humus-rich Clay,8.03,23.9,3.0,71.7,9.5,6.08,-9.8,0.94,False,Baseline Soil,Standard background soil composition
+SUB-2026-075,35.34,13.26,36.4,Sandy Clay,5.38,28.1,1.72,60.9,25.8,17.81,-32.4,1.77,False,Baseline Soil,Standard background soil composition
+SUB-2026-076,36.45,12.2,93.4,Sandy Clay,6.95,39.6,3.34,53.6,11.9,17.51,-36.6,0.89,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-077,38.56,48.65,214.3,Clay Loam,5.98,22.4,5.67,21.1,17.0,4.07,-39.2,1.51,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-078,3.7,19.65,25.4,Sandy Clay,6.11,22.4,1.86,43.6,44.5,17.33,-17.5,2.2,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-079,17.92,44.6,207.3,Silt Loam,6.03,34.1,4.97,41.1,13.3,12.95,-18.8,1.94,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-080,5.79,31.56,84.8,Clay Loam,5.81,25.6,5.68,33.2,26.5,16.15,-20.9,1.66,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-081,43.16,39.74,47.2,Sandy Clay,6.54,18.7,3.84,65.6,30.9,10.37,-31.9,1.23,False,Baseline Soil,Standard background soil composition
+SUB-2026-082,31.16,25.13,180.2,Sandy Loam,5.84,25.6,6.9,49.7,34.0,11.22,-26.3,1.67,False,Baseline Soil,Standard background soil composition
+SUB-2026-083,16.54,28.85,164.7,Silt Loam,6.72,16.2,2.25,20.7,28.7,10.84,-19.2,1.54,False,Baseline Soil,Standard background soil composition
+SUB-2026-084,3.18,24.63,221.8,Silt Loam,6.46,17.3,2.03,30.4,8.4,13.34,-22.6,1.4,False,Baseline Soil,Standard background soil composition
+SUB-2026-085,15.55,9.76,189.1,Silt Loam,6.31,27.0,6.6,62.8,20.1,5.96,-5.4,0.98,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-086,16.26,36.12,204.8,Clay Loam,5.77,24.6,4.97,20.3,27.2,4.42,-35.2,2.04,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-087,36.48,14.04,84.9,Sandy Clay,6.04,39.4,6.32,74.6,11.3,8.31,-15.7,1.43,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-088,31.88,1.22,60.8,Sandy Clay,7.1,22.9,4.54,49.7,21.0,13.87,-25.8,1.07,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-089,44.36,32.27,192.6,Sandy Loam,6.9,29.4,3.22,48.6,9.2,6.83,-25.0,1.31,False,Baseline Soil,Standard background soil composition
+SUB-2026-090,23.61,8.86,205.6,Sandy Loam,5.72,31.0,7.23,56.5,10.9,13.43,-14.9,1.38,False,Baseline Soil,Standard background soil composition
+SUB-2026-091,5.98,47.02,247.8,Silt Loam,6.58,12.4,7.1,72.7,22.7,17.58,-15.8,1.96,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-092,35.66,47.7,114.9,Sandy Loam,7.1,31.9,6.36,39.3,12.9,5.31,-5.3,1.83,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-093,38.04,45.74,105.6,Clay Loam,5.16,17.3,3.41,62.5,29.0,13.42,-35.5,1.88,False,Baseline Soil,Standard background soil composition
+SUB-2026-094,28.06,18.51,198.6,Sandy Clay,6.93,40.8,5.63,54.6,33.5,10.21,-36.4,0.82,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-095,38.55,0.77,98.4,Silt Loam,5.97,16.5,4.03,33.7,37.6,16.15,-14.6,1.38,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-096,24.69,46.42,234.1,Sandy Loam,6.96,24.4,2.14,76.5,15.4,6.48,-19.8,1.47,False,Baseline Soil,Standard background soil composition
+SUB-2026-097,26.14,21.41,217.4,Clay Loam,5.89,14.6,7.92,70.8,14.2,13.7,-30.4,0.83,False,Baseline Soil,Standard background soil composition
+SUB-2026-098,21.38,48.33,118.7,Clay Loam,5.06,41.9,2.46,61.1,11.9,15.73,-37.2,1.16,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-099,1.27,48.18,192.7,Sandy Loam,5.2,27.1,8.15,74.5,31.5,17.22,-37.0,1.86,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-100,5.39,42.65,193.5,Sandy Clay,6.54,29.9,4.62,75.7,34.1,13.57,-8.7,0.99,False,Baseline Soil,Standard background soil composition
+SUB-2026-101,1.57,14.72,43.7,Sandy Loam,6.71,14.0,2.8,64.6,9.2,10.96,-33.3,1.55,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-102,31.82,19.25,227.6,Silt Loam,5.78,34.5,5.29,73.6,42.6,12.65,-28.7,1.1,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-103,15.72,42.56,136.2,Sandy Loam,7.01,18.3,7.61,63.8,9.9,16.16,-32.1,0.82,False,Baseline Soil,Standard background soil composition
+SUB-2026-104,25.43,15.85,210.1,Clay Loam,5.17,38.9,6.63,62.6,28.0,11.99,-27.6,1.14,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-105,45.38,8.47,93.6,Sandy Loam,6.45,18.2,7.15,58.3,34.2,4.43,-37.6,2.17,False,Baseline Soil,Standard background soil composition
+SUB-2026-106,12.46,27.84,226.0,Sandy Clay,5.53,17.7,6.11,67.7,40.2,17.03,-21.8,1.92,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-107,20.52,46.81,109.5,Humus-rich Clay,5.98,13.1,6.35,26.1,34.4,13.65,-37.6,2.14,False,Baseline Soil,Standard background soil composition
+SUB-2026-108,37.78,34.8,22.5,Sandy Loam,6.54,26.2,7.44,76.7,37.7,13.47,-12.0,1.48,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-109,11.44,28.5,228.2,Sandy Clay,5.81,28.9,3.25,76.0,20.6,7.02,-31.8,0.95,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-110,3.85,4.86,41.0,Sandy Clay,6.19,14.0,4.93,17.0,38.1,13.22,-21.1,1.57,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-111,14.49,30.75,93.4,Clay Loam,7.31,35.3,3.05,72.8,11.0,9.51,-9.2,1.44,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-112,8.06,49.5,238.5,Sandy Clay,6.04,25.6,8.41,24.0,41.1,13.12,-17.2,1.98,False,Baseline Soil,Standard background soil composition
+SUB-2026-113,46.48,7.0,238.6,Sandy Clay,7.17,27.7,8.11,38.5,28.3,5.49,-21.3,0.94,False,Baseline Soil,Standard background soil composition
+SUB-2026-114,40.41,25.92,151.9,Sandy Clay,5.6,25.2,1.78,67.0,38.2,13.21,-28.6,1.48,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-115,31.67,43.87,165.3,Sandy Clay,6.92,24.0,6.44,26.3,24.7,17.99,-28.3,1.01,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-116,43.57,37.04,123.1,Silt Loam,7.65,28.8,7.98,72.3,31.8,4.67,-16.6,1.25,False,Baseline Soil,Standard background soil composition
+SUB-2026-117,40.18,34.85,87.4,Silt Loam,4.52,16.7,2.76,73.2,27.5,17.68,-5.2,1.83,False,Baseline Soil,Standard background soil composition
+SUB-2026-118,9.33,35.12,95.6,Clay Loam,5.86,17.5,5.48,50.5,35.1,9.7,-16.8,1.47,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-119,44.63,17.97,174.7,Sandy Loam,6.96,37.9,7.91,15.4,11.0,16.19,-20.5,1.33,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-120,26.97,14.68,193.0,Sandy Clay,6.34,40.4,1.74,35.1,10.2,14.95,-14.4,1.35,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-121,40.37,40.47,202.1,Sandy Loam,6.8,23.2,6.38,58.2,17.1,11.94,-23.7,1.44,False,Baseline Soil,Standard background soil composition
+SUB-2026-122,44.8,40.51,201.6,Sandy Loam,6.02,20.1,3.58,83.7,13.9,14.34,-37.9,1.9,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-123,15.9,43.35,41.0,Clay Loam,6.57,31.3,7.97,59.2,40.3,16.3,-20.3,2.05,False,Baseline Soil,Standard background soil composition
+SUB-2026-124,5.5,45.66,133.7,Sandy Clay,6.38,24.3,8.3,33.2,16.1,9.66,-6.5,2.14,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-125,11.4,25.57,33.2,Sandy Clay,7.43,12.8,8.11,59.4,44.1,8.58,-33.9,1.9,False,Baseline Soil,Standard background soil composition
+SUB-2026-126,21.36,25.08,146.4,Humus-rich Clay,6.7,16.7,4.82,52.8,20.5,13.35,-15.8,1.24,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-127,40.9,39.91,121.6,Sandy Loam,6.77,33.5,7.53,69.6,14.7,15.31,-33.0,1.76,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-128,43.04,32.5,224.2,Sandy Loam,6.17,31.8,7.41,22.5,37.2,14.67,-21.2,1.41,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-129,0.35,35.1,100.7,Silt Loam,6.11,12.8,3.73,68.3,32.4,15.17,-36.6,1.16,False,Baseline Soil,Standard background soil composition
+SUB-2026-130,25.54,39.79,46.9,Humus-rich Clay,6.15,18.7,7.3,52.9,26.4,10.1,-24.2,1.98,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-131,20.87,44.5,52.9,Silt Loam,6.82,18.9,1.76,82.4,28.5,15.45,-13.5,0.85,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-132,11.11,16.9,195.1,Silt Loam,6.16,32.2,5.67,38.9,34.6,5.68,-27.8,2.06,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-133,5.99,18.78,162.2,Silt Loam,6.73,12.6,3.11,59.3,16.5,11.62,-16.7,1.45,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-134,16.88,4.7,43.3,Clay Loam,8.16,15.1,2.34,80.2,44.9,4.08,-12.2,1.69,False,Baseline Soil,Standard background soil composition
+SUB-2026-135,47.15,28.91,39.3,Clay Loam,7.2,36.0,2.04,22.2,44.1,8.54,-7.5,1.72,False,Baseline Soil,Standard background soil composition
+SUB-2026-136,16.16,1.8,181.2,Silt Loam,6.24,17.4,6.37,80.6,32.1,9.13,-31.8,2.05,False,Baseline Soil,Standard background soil composition
+SUB-2026-137,25.94,23.28,36.7,Humus-rich Clay,7.46,31.6,3.88,63.2,15.4,9.55,-26.0,1.69,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-138,35.15,27.13,209.0,Sandy Loam,6.17,19.1,6.57,19.7,33.2,13.74,-34.7,1.66,False,Baseline Soil,Standard background soil composition
+SUB-2026-139,18.18,14.33,182.4,Humus-rich Clay,4.87,15.0,1.96,36.1,10.7,9.44,-5.3,0.89,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-140,48.59,29.54,38.7,Sandy Clay,5.69,19.3,3.71,64.6,9.1,10.28,-7.6,1.53,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-141,48.12,1.53,39.5,Clay Loam,5.0,33.7,5.28,19.7,17.5,7.33,-21.1,1.01,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-142,12.59,1.87,246.9,Sandy Loam,6.22,37.7,7.04,55.8,25.1,9.23,-10.5,1.83,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-143,24.86,41.13,106.1,Sandy Loam,6.51,36.9,3.73,39.2,40.1,7.18,-21.8,1.52,False,Baseline Soil,Standard background soil composition
+SUB-2026-144,15.04,18.01,105.2,Sandy Clay,7.84,23.9,5.88,58.5,34.9,5.02,-18.2,1.75,False,Baseline Soil,Standard background soil composition
+SUB-2026-145,14.24,6.35,206.9,Sandy Clay,6.76,32.0,7.7,18.2,35.5,12.45,-36.9,0.86,False,Baseline Soil,Standard background soil composition
+SUB-2026-146,1.84,26.11,237.9,Silt Loam,6.32,18.1,5.81,76.0,23.7,13.35,-13.6,0.92,True,Subsurface Void,Sharp decrease in dielectric permittivity
+SUB-2026-147,30.48,38.5,246.8,Clay Loam,7.16,20.8,3.13,83.1,20.8,12.67,-35.5,1.8,True,Soil Compaction Anomaly,Increased bulk density reading
+SUB-2026-148,25.13,10.79,193.3,Clay Loam,4.73,38.9,1.67,82.8,21.7,10.49,-11.1,0.9,True,Organic Residue Feature,Elevated organic carbon and phosphorus localized spike
+SUB-2026-149,2.57,31.14,106.5,Humus-rich Clay,6.69,12.4,7.59,67.5,44.5,9.32,-12.6,0.9,True,Dense Root Structure,High dielectric contrast; typical root zone cluster
+SUB-2026-150,13.93,4.27,39.2,Silt Loam,7.12,14.6,1.65,24.1,9.5,16.09,-15.2,0.82,True,Soil Compaction Anomaly,Increased bulk density reading

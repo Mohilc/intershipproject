@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TERRA-SENSE AI | Multi-Model Subsurface Human Bio-Detection & Search System</title>
+  <meta name="description" content="Subsurface Disaster Search & Rescue System using 4 Python AI Models (Gradient Boosting, Random Forest, Neural Network, SVM) to predict human presence and guide rescue operations.">
+  
+  <!-- DNS Prefetch & Preconnect for CDN domains -->
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+
+  <!-- Google Fonts (non-blocking with swap) -->
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
+
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css">
+
+
+  <!-- External Libraries via CDN (deferred to avoid render-blocking) -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+<body>
+
+  <!-- SVG Gradient Definitions for SVG Gauges -->
+  <svg style="width:0;height:0;position:absolute;">
+    <defs>
+      <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#00f2fe" />
+        <stop offset="50%" stop-color="#10b981" />
+        <stop offset="100%" stop-color="#3b82f6" />
+      </linearGradient>
+    </defs>
+  </svg>
+
+  <!-- Application Header Navbar -->
+  <header class="app-header">
+    <div class="brand-container">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>TERRA-SENSE AI</h1>
+        <p>Subsurface Bio-Detection & Search-and-Rescue Command</p>
+      </div>
+    </div>
+
+    <div class="header-status-bar">
+      <div class="status-pill">
+        <span class="pulse-dot scanning" id="pulseDot"></span>
+        <span>ARRAY STATUS: <strong id="headerArrayStatus" style="color: var(--primary-cyan)">READY FOR SCAN</strong></span>
+      </div>
+      <div class="status-pill">
+        <span>AI ACCURACY: <strong id="headerAccuracyVal" style="color: var(--accent-emerald)">98.6%</strong></span>
+      </div>
+      <div class="status-pill">
+        <span>ENGINE: <strong style="color: var(--text-main)">AI Analytics Engine</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Control & Preset Toolbar -->
+  <nav class="control-toolbar">
+    <div class="scan-controls">
+      <button class="btn-main btn-primary" id="btnInitiateScan">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
+        </svg>
+        <span id="btnScanText">INITIATE SEARCH SCAN</span>
+      </button>
+
+      <button class="btn-main btn-secondary" id="btnExportReport">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        EXPORT RESCUE REPORT
+      </button>
+
+      <button class="btn-main btn-secondary" id="btnToggleAudio" title="Toggle Sound Synthesizer">
+        <svg id="audioIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        </svg>
+        <span id="audioText">AUDIO ON</span>
+      </button>
+
+      <button class="btn-main btn-secondary" id="btnToggleRotate" title="Toggle 3D View Auto-Rotate">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span id="rotateText">AUTO ROTATE</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Live Radar Scanning Sequence Banner -->
+  <div class="scan-progress-container" id="scanProgressSection">
+    <div class="scan-status-label">
+      <span id="scanPhaseText">STATUS: PRESS 'INITIATE SEARCH SCAN' TO ANALYZE SUBSURFACE SOIL MATRIX</span>
+      <span id="scanPercentVal">0%</span>
+    </div>
+    <div class="scan-progress-bar-bg">
+      <div class="scan-progress-bar-fill" id="scanProgressBarFill"></div>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Grid Layout -->
+  <main class="dashboard-grid">
+
+    <!-- Column 1: AI Prediction & Telemetry Controls -->
+    <section class="card-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+          4-AI MODEL CONSENSUS PREDICTION
+        </div>
+        <span class="panel-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.35);">MULTI-AI</span>
+      </div>
+
+      <div class="prediction-card">
+        <div class="gauge-wrapper">
+          <svg class="gauge-svg" viewBox="0 0 200 200">
+            <circle class="gauge-bg" cx="100" cy="100" r="90" />
+            <circle class="gauge-progress" id="gaugeProgress" cx="100" cy="100" r="90" />
+          </svg>
+          <div class="gauge-inner-content">
+            <span class="probability-val" id="probabilityVal">--<span class="probability-unit">%</span></span>
+            <span class="probability-lbl">HUMAN PROBABILITY</span>
+          </div>
+        </div>
+
+        <div class="detection-banner clear" id="detectionBanner">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          READY TO SCAN SOIL MATRIX
+        </div>
+      </div>
+
+
+
+      <!-- Telemetry Readouts -->
+      <div class="telemetry-grid" style="margin-top: 0.9rem;">
+        <div class="telemetry-item">
+          <span class="telemetry-label">ESTIMATED DEPTH</span>
+          <span class="telemetry-value highlight" id="telemetryDepth">--</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-label">VITAL HARMONICS</span>
+          <span class="telemetry-value" id="telemetryVital">--</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-label">SIGNAL SNR</span>
+          <span class="telemetry-value" id="telemetrySnr">--</span>
+        </div>
+        <div class="telemetry-item">
+          <span class="telemetry-label">DIELECTRIC SHIFT</span>
+          <span class="telemetry-value" id="telemetryDielectric">--</span>
+        </div>
+      </div>
+
+      <!-- Search & Rescue Field Operation Advisory -->
+      <div style="margin-top: 1.1rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.9rem;">
+        <div style="font-family: var(--font-tech); font-size: 0.95rem; font-weight: 700; color: var(--primary-cyan); margin-bottom: 0.55rem; display: flex; align-items: center; gap: 0.45rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          SEARCH & RESCUE COMMAND ADVISORY
+        </div>
+        <div id="rescueAdvisoryContent">
+          <div style="padding: 0.8rem; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: var(--radius-sm); text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+            PRESS 'INITIATE SEARCH SCAN' TO GENERATE RESCUE FIELD STRATEGY & OXYGEN ESTIMATION.
+          </div>
+        </div>
+      </div>
+
+      <!-- ── SURVIVAL STATUS PANEL (filled by JS after detection) ── -->
+      <div id="survivalPanel" style="display:none; margin-top:1rem; border:1px solid rgba(255,255,255,0.12); border-radius:var(--radius-md); padding:0.85rem; transition:border-color 0.4s ease, background 0.4s ease;">
+        <!-- Content injected by JS -->
+      </div>
+    </section>
+
+
+    <!-- Column 2: Interactive 3D Subsurface Map & Lab Cam -->
+    <section class="card-panel panel-3d">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          3D SUBSURFACE 4-SECTOR SCAN GRID
+        </div>
+        <div class="sector-focus-toolbar">
+          <button class="btn-sector-nav active" id="btnFocusSectorAll" title="Focus All Sectors">ALL</button>
+          <button class="btn-sector-nav" id="btnFocusSectorA" title="Focus Sector A (NW)">SEC-A</button>
+          <button class="btn-sector-nav" id="btnFocusSectorB" title="Focus Sector B (NE)">SEC-B</button>
+          <button class="btn-sector-nav" id="btnFocusSectorC" title="Focus Sector C (SW)">SEC-C</button>
+          <button class="btn-sector-nav" id="btnFocusSectorD" title="Focus Sector D (SE)">SEC-D</button>
+        </div>
+      </div>
+
+      <div id="canvas3d-container">
+        <div class="map-3d-overlay">
+          <button class="map-control-btn" id="btnResetCamera" title="Reset View">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+        </div>
+
+        <div id="map3dTelemetryOverlay" style="display: none; position: absolute; top: 0.9rem; left: 0.9rem; background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(10px); border: 1px solid var(--accent-emerald); border-radius: var(--radius-sm); padding: 0.65rem 0.85rem; font-family: var(--font-mono); font-size: 0.73rem; color: var(--text-main); z-index: 10; line-height: 1.55; box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);">
+          <!-- Dynamic JS Telemetry -->
+        </div>
+
+        <div class="map-3d-legend">
+          <div class="legend-item"><span class="legend-color" style="background:#00f2fe"></span><span>Sector A — NW Quadrant</span></div>
+          <div class="legend-item"><span class="legend-color" style="background:#fbbf24"></span><span>Sector B — NE Quadrant</span></div>
+          <div class="legend-item"><span class="legend-color" style="background:#10b981"></span><span>Sector C — SW Quadrant</span></div>
+          <div class="legend-item"><span class="legend-color" style="background:#8b5cf6"></span><span>Sector D — SE Quadrant</span></div>
+          <div class="legend-item"><span class="legend-color" style="background:#ffffff; opacity:0.5"></span><span>Sector Divider Lines</span></div>
+          <div class="legend-item"><span class="legend-color" style="background:#f43f5e"></span><span>Signal Wave Propagation</span></div>
+        </div>
+      </div>
+
+      <!-- 4-Sector Status Panel -->
+      <div style="margin-top:0.9rem; border-top:1px solid rgba(255,255,255,0.07); padding-top:0.75rem;">
+        <div style="font-family:var(--font-tech);font-size:0.88rem;font-weight:700;color:var(--primary-cyan);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          SECTOR STATUS GRID
+        </div>
+        <div id="sectorStatusPanel" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.45rem;">
+          <!-- Dynamically populated by JS -->
+          <div style="background:rgba(0,242,254,0.05);border:1px solid rgba(0,242,254,0.25);border-radius:var(--radius-sm);padding:0.45rem 0.6rem;text-align:center;">
+            <div style="font-family:var(--font-tech);font-weight:800;font-size:1.1rem;color:#00f2fe;">A</div>
+            <div style="font-family:var(--font-tech);font-size:0.6rem;color:#94a3b8;margin-bottom:2px;">NW Quadrant</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:#4e6178;font-weight:700;">STANDBY</div>
+          </div>
+          <div style="background:rgba(251,191,36,0.05);border:1px solid rgba(251,191,36,0.25);border-radius:var(--radius-sm);padding:0.45rem 0.6rem;text-align:center;">
+            <div style="font-family:var(--font-tech);font-weight:800;font-size:1.1rem;color:#fbbf24;">B</div>
+            <div style="font-family:var(--font-tech);font-size:0.6rem;color:#94a3b8;margin-bottom:2px;">NE Quadrant</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:#4e6178;font-weight:700;">STANDBY</div>
+          </div>
+          <div style="background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius-sm);padding:0.45rem 0.6rem;text-align:center;">
+            <div style="font-family:var(--font-tech);font-weight:800;font-size:1.1rem;color:#10b981;">C</div>
+            <div style="font-family:var(--font-tech);font-size:0.6rem;color:#94a3b8;margin-bottom:2px;">SW Quadrant</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:#4e6178;font-weight:700;">STANDBY</div>
+          </div>
+          <div style="background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius-sm);padding:0.45rem 0.6rem;text-align:center;">
+            <div style="font-family:var(--font-tech);font-weight:800;font-size:1.1rem;color:#8b5cf6;">D</div>
+            <div style="font-family:var(--font-tech);font-size:0.6rem;color:#94a3b8;margin-bottom:2px;">SE Quadrant</div>
+            <div style="font-family:var(--font-mono);font-size:0.65rem;color:#4e6178;font-weight:700;">STANDBY</div>
+          </div>
+        </div>
+      </div>
+
+
+
+    </section>
+
+    <!-- Column 3: Signal Spectrum Analytics & File Upload -->
+    <section class="card-panel panel-charts">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          SIGNAL ANALYTICS & SPECTRUM
+        </div>
+        <span class="panel-badge">LIVE ANALYTICS</span>
+      </div>
+
+      <div class="chart-tabs">
+        <button class="tab-btn active" id="tabHarmonics">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Bio-Harmonics
+        </button>
+        <button class="tab-btn" id="tabDepth">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/></svg>
+          Depth Profile
+        </button>
+        <button class="tab-btn" id="tabHistory">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Detection History
+        </button>
+      </div>
+
+      <!-- Live Chart Insight Banner -->
+      <div class="chart-insight-box" id="chartInsightBanner">
+        <span class="insight-dot"></span>
+        <span id="chartInsightText">Initiate search scan to view live signal spectrum harmonics.</span>
+      </div>
+
+      <div class="chart-wrapper chart-container-item" id="wrapperHarmonics">
+        <canvas id="chartHarmonics"></canvas>
+      </div>
+      <div class="chart-wrapper chart-container-item" id="wrapperDepth" style="display: none;">
+        <canvas id="chartDepth"></canvas>
+      </div>
+      <div class="chart-wrapper chart-container-item" id="wrapperHistory" style="display: none;">
+        <canvas id="chartHistory"></canvas>
+      </div>
+
+      <div class="panel-upload-report" style="margin-top: 1.1rem;">
+
+        <!-- Human Bio-Signal Analyzer & Vitals Simulator Controls -->
+        <div class="human-analysis-card">
+          <div class="human-analysis-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+            HUMAN BIO-SIGNAL ANALYZER & CONTROLS
+          </div>
+
+          <div class="vitals-input-grid">
+            <div class="vital-slider-group">
+              <div class="vital-slider-header">
+                <span>HEARTBEAT (PULSE)</span>
+                <strong id="heartbeatValDisplay" style="color: #f43f5e;">69 BPM</strong>
+              </div>
+              <input type="range" id="sliderHeartbeat" min="0" max="140" value="69" step="1" class="cyber-slider">
+            </div>
+
+            <div class="vital-slider-group">
+              <div class="vital-slider-header">
+                <span>RESPIRATION (BREATH)</span>
+                <strong id="breathingValDisplay" style="color: #00f2fe;">18 BPM</strong>
+              </div>
+              <input type="range" id="sliderBreathing" min="0" max="36" value="18" step="1" class="cyber-slider">
+            </div>
+
+            <div class="vital-slider-group">
+              <div class="vital-slider-header">
+                <span>TARGET DEPTH</span>
+                <strong id="depthValDisplay" style="color: var(--accent-amber);">1.85 M</strong>
+              </div>
+              <input type="range" id="sliderDepth" min="0.3" max="5.0" value="1.85" step="0.05" class="cyber-slider">
+            </div>
+          </div>
+
+          <!-- Human Vitals Quick Presets -->
+          <div class="human-presets-row">
+            <button class="btn-preset-mini active" id="presetStandardHuman" title="Standard Trapped Human (69 BPM pulse, 18 BPM breath)">Standard Victim</button>
+            <button class="btn-preset-mini" id="presetCriticalTachy" title="Critical Stress (114 BPM Tachycardia, 26 BPM Breath)">Critical Victim</button>
+            <button class="btn-preset-mini" id="presetShallowHypopnea" title="Shallow Breathing / Hypoxia (54 BPM Bradycardia, 9 BPM Breath)">Shallow Vitals</button>
+            <button class="btn-preset-mini" id="presetClearDebris" title="Debris Echo (0 BPM pulse - Clear Matrix)">Debris Echo (Clear)</button>
+          </div>
+        </div>
+
+        <!-- Upload Dropzone -->
+        <div class="upload-dropzone" id="uploadDropzone" title="Click or Drag & Drop CSV / GPR scan file">
+          <input type="file" id="fileInputSim" style="display: none;" accept=".csv,.gpr,.png,.jpg,.json,.txt">
+          <div class="upload-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <div class="upload-text" id="uploadTextLabel">Upload Custom GPR Scan / CSV File</div>
+          <div class="upload-hint">Click to browse or Drag & Drop CSV dataset to run AI prediction</div>
+        </div>
+
+        <!-- File Details Box (Shown when file loaded) -->
+        <div id="fileInfoBox" class="file-info-box" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+            <span id="fileInfoName" style="font-weight: 700; color: var(--primary-cyan);">filename.csv</span>
+            <span id="fileInfoRows" class="badge-mini">16 ROWS</span>
+          </div>
+          <div id="fileInfoSummary" style="font-size: 0.7rem; color: var(--text-muted); font-family: var(--font-mono);">
+            Scan Date: 2026-07-27 | Target Peak @ 1.85m
+          </div>
+        </div>
+
+        <button class="btn-preset" id="btnLoadSampleCsv" style="width: 100%; justify-content: center; margin-bottom: 0.9rem; background: rgba(0, 242, 254, 0.08); border-color: var(--primary-cyan); color: var(--primary-cyan); font-weight: 600;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          LOAD & SCAN SAMPLE CSV FILE (16 ROWS)
+        </button>
+
+        <div class="report-summary-box" id="reportConsoleBox">
+          <div class="report-row"><span class="report-key">AI ENGINE:</span> <span class="report-val">Multi-Channel Analytics Engine</span></div>
+          <div class="report-row"><span class="report-key">ACCURACY SCORE:</span> <span class="report-val" style="color: var(--accent-emerald)">98.6%</span></div>
+          <div class="report-row"><span class="report-key">SCAN STATUS:</span> <span class="report-val">READY FOR SCAN SEQUENCE</span></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Interactive Rescue Mission Report Modal -->
+  <div class="modal-overlay" id="reportModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          SUBSURFACE RESCUE OPERATION MISSION REPORT
+        </div>
+        <button class="modal-close-btn" id="btnCloseModal">&times;</button>
+      </div>
+
+      <div class="modal-body" id="modalReportBody">
+        <!-- Content dynamically injected by JS -->
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-main btn-primary" id="btnPrintModalReport">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          PRINT / EXPORT PDF
+        </button>
+        <button class="btn-main btn-secondary" id="btnDownloadJsonReport">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          DOWNLOAD JSON DATA
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Quick Bar -->
+  <div class="keyboard-shortcuts-bar">
+    <span><span class="key-badge">SPACE</span> / <span class="key-badge">S</span> INITIATE SCAN</span>
+    <span><span class="key-badge">L</span> TOGGLE LAB CAM</span>
+    <span><span class="key-badge">A</span> BIO AUDIO SYNTHESIZER</span>
+    <span><span class="key-badge">R</span> EXPORT REPORT</span>
+  </div>
+
+  <footer class="app-footer">
+    TERRA-SENSE AI Subsurface Human Bio-Detection & Search-and-Rescue System &copy; 2026. Powered by AI Analytics Engine & WebGL.
+  </footer>
+
+  <!-- Unified Standalone Script (deferred) -->
+  <script defer src="js/main.js"></script>
+
+</body>
+</html>
