@@ -347,6 +347,11 @@ body {
 .telemetry-value.highlight {
   color: var(--primary-cyan);
 }
+.telemetry-item.full-width {
+  grid-column: span 2;
+  border-color: rgba(0, 242, 254, 0.15);
+  background: rgba(0, 242, 254, 0.02);
+}
 
 /* 3D Map viewport */
 #canvas3d-container {

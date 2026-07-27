@@ -62,6 +62,8 @@ class TerraSenseApp {
     this.isAudioMuted = false;
     this.isAutoRotate = false;
     this.lastScanDate = new Date().toISOString().slice(0, 16);
+    this.gpsBase = { lat: 28.613928, lon: 77.209060 };
+    this.currentGps = "";
 
     this.isScanning   = false;
     this.scanInterval = null;
@@ -942,6 +944,28 @@ class TerraSenseApp {
     document.getElementById('btnLoadSampleCsv')?.addEventListener('click', () => this.loadSampleCsv());
     document.getElementById('btnExportReport')?.addEventListener('click', () => this.exportReport());
 
+    // Copy GPS Coordinates
+    document.getElementById('btnCopyGps')?.addEventListener('click', () => {
+      if (this.currentGps && this.currentGps !== "N/A - MATRIX CLEAR") {
+        navigator.clipboard.writeText(this.currentGps).then(() => {
+          const btn = document.getElementById('btnCopyGps');
+          if (btn) {
+            btn.textContent = "COPIED!";
+            btn.style.color = "var(--accent-emerald)";
+            btn.style.borderColor = "var(--accent-emerald)";
+            setTimeout(() => {
+              btn.textContent = "COPY";
+              btn.style.color = "";
+              btn.style.borderColor = "";
+            }, 1200);
+          }
+          this.playBeep(650, 0.08);
+        }).catch(err => console.error("Could not copy text: ", err));
+      } else {
+        this.playBeep(330, 0.15);
+      }
+    });
+
     // Date controls
     document.getElementById('btnDateNow')?.addEventListener('click', () => {
       const dateInput = document.getElementById('scanDateInput');
@@ -1324,6 +1348,8 @@ class TerraSenseApp {
 
     const banner = document.getElementById('detectionBanner');
 
+    let gpsText = "N/A - MATRIX CLEAR";
+
     if (isHuman) {
       // Deterministically map sector based on depth & vital characteristics
       let detSec = SECTORS[0];
@@ -1331,6 +1357,17 @@ class TerraSenseApp {
       if (hbBpm > 95) detSec = SECTORS[1]; // Sector B (NE)
       else if (this.params.depth >= 2.0 && this.params.depth <= 3.0) detSec = SECTORS[2]; // Sector C (SW)
       else if (this.params.depth > 3.0) detSec = SECTORS[3]; // Sector D (SE)
+
+      // Apply small high-precision lat/lon offsets based on target quadrant
+      let latOff = 0.00018, lonOff = 0.00015;
+      if (detSec.id === 'A') { latOff *= 1; lonOff *= -1; }
+      else if (detSec.id === 'B') { latOff *= 1; lonOff *= 1; }
+      else if (detSec.id === 'C') { latOff *= -1; lonOff *= -1; }
+      else if (detSec.id === 'D') { latOff *= -1; lonOff *= 1; }
+
+      const vLat = this.gpsBase.lat + latOff;
+      const vLon = this.gpsBase.lon + lonOff;
+      gpsText = `${vLat.toFixed(6)}° N, ${Math.abs(vLon).toFixed(6)}° E`;
 
       this._highlightSector(detSec.id, oxyHours);
       this._updateTelemetryOverlay('DETECTED', detSec.id, oxyHours);
@@ -1364,6 +1401,10 @@ class TerraSenseApp {
         CLEAR MATRIX — NO LIFE DETECTED IN ANY SECTOR
       `;
     }
+
+    this.currentGps = gpsText;
+    const gpsTextEl = document.getElementById('telemetryGpsText');
+    if (gpsTextEl) gpsTextEl.textContent = gpsText;
 
     document.getElementById('telemetryDepth').textContent      = `${this.params.depth.toFixed(2)} M`;
     document.getElementById('telemetryVital').textContent      = `${(this.params.breathing*60).toFixed(0)} bpm / ${(this.params.heartbeat*60).toFixed(0)} bpm`;
@@ -1544,17 +1585,28 @@ class TerraSenseApp {
     const scanDateVal = document.getElementById('scanDateInput')?.value || new Date().toISOString().slice(0, 16);
     const dateFormatted = scanDateVal.replace('T', ' ');
     const prob = document.getElementById('probabilityVal')?.textContent || '--';
-    const isHuman = this.detectionResult?.result?.prediction === 1;
+    const isHuman = this.detectionResult?.result?.prediction === 1 || this.detectionResult?.result?.human_detected === true;
+
+    let detectedSectorLabel = "NO TARGET DETECTED";
+    if (isHuman) {
+      let detSec = SECTORS[0];
+      const hbBpm = Math.round(this.params.heartbeat * 60);
+      if (hbBpm > 95) detSec = SECTORS[1];
+      else if (this.params.depth >= 2.0 && this.params.depth <= 3.0) detSec = SECTORS[2];
+      else if (this.params.depth > 3.0) detSec = SECTORS[3];
+      detectedSectorLabel = detSec.label;
+    }
 
     body.innerHTML = `
       <div style="border-bottom: 2px solid var(--primary-cyan); padding-bottom: 1rem; margin-bottom: 1.2rem;">
         <h2 style="font-family: var(--font-tech); color: var(--primary-cyan); font-size: 1.4rem; margin-bottom: 0.25rem;">
           SUBSURFACE HUMAN BIO-DETECTION MISSION REPORT
         </h2>
-        <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted);">
+        <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap; gap: 0.5rem;">
           <span>TIMESTAMP: <strong style="color: #fff;">${dateFormatted}</strong></span>
           <span>SYSTEM: <strong style="color: #fff;">TERRA-SENSE MULTI-AI COMMAND</strong></span>
-          <span>LOCATION: <strong style="color: var(--accent-emerald);">GRID SECTOR ALPHA</strong></span>
+          <span>LOCATION: <strong style="color: var(--accent-emerald);">${detectedSectorLabel}</strong></span>
+          <span>GPS COORDINATES: <strong style="color: var(--primary-cyan);">${this.currentGps}</strong></span>
         </div>
       </div>
 
