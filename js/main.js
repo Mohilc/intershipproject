@@ -69,6 +69,8 @@ class TerraSenseApp {
     this.scanInterval = null;
     this.scanProgress = 0;
 
+    this.espPollInterval = null; // Live ESP32 Telemetry polling interval
+
     this._lastFrameTime = 0;
     this._resizeTimeout = null;
 
@@ -82,6 +84,8 @@ class TerraSenseApp {
       dielectric: 8.4,
       density:  1650.0
     };
+    
+    this.syncUIFromParams = null; // Store reference to UI synchronization
   }
 
   init() {
@@ -116,7 +120,8 @@ class TerraSenseApp {
       if (dpDisplay) dpDisplay.textContent = `${dp.toFixed(2)} M`;
     };
 
-    syncUIFromParams();
+    this.syncUIFromParams = syncUIFromParams;
+    this.syncUIFromParams();
 
     sliderHb?.addEventListener('input', (e) => {
       const val = parseInt(e.target.value);
@@ -894,7 +899,7 @@ class TerraSenseApp {
     const bHz = this.params.breathing, hHz = this.params.heartbeat;
     chart.data.datasets[0].data = Array.from({length:50},(_,i)=>Math.sin(i*0.1*Math.PI*2*bHz));
     chart.data.datasets[1].data = Array.from({length:50},(_,i)=>Math.sin(i*0.1*Math.PI*2*hHz)*0.6+(Math.random()-0.5)*0.05);
-    chart.update();
+    chart.update('none');
   }
 
   updateDepthChart() {
@@ -902,7 +907,7 @@ class TerraSenseApp {
     if (!chart) return;
     const di = Math.round(this.params.depth / 0.5);
     chart.data.datasets[0].data = Array.from({length:15},(_,i)=>{ let v=-2*i; if(i===di) v+=this.params.snr; return v; });
-    chart.update();
+    chart.update('none');
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -938,6 +943,16 @@ class TerraSenseApp {
   //  Event Bindings
   // ═══════════════════════════════════════════════════════════════
   bindEvents() {
+    // ESP32 Live Telemetry toggle
+    const espToggle = document.getElementById('espTelemetryToggle');
+    espToggle?.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        this.startEspTelemetryPolling();
+      } else {
+        this.stopEspTelemetryPolling();
+      }
+    });
+
     // Scan Initiate Button
     document.getElementById('btnInitiateScan')?.addEventListener('click', () => this.startScanSequence());
     document.getElementById('btnResetCamera')?.addEventListener('click', () => this.resetCamera());
@@ -1681,6 +1696,275 @@ class TerraSenseApp {
     a.download = `terra_sense_rescue_report_${new Date().getTime()}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  Live ESP32 Hardware Telemetry Integration
+  // ═══════════════════════════════════════════════════════════════
+  startEspTelemetryPolling() {
+    if (this.espPollInterval) return;
+    
+    const toggleText = document.getElementById('espToggleText');
+    if (toggleText) toggleText.textContent = "POLLING...";
+    
+    // Poll instantly
+    this.pollTelemetry();
+    
+    // Poll every 1.5 seconds
+    this.espPollInterval = setInterval(() => {
+      this.pollTelemetry();
+    }, 1500);
+    
+    this.playBeep(650, 0.1);
+  }
+
+  stopEspTelemetryPolling() {
+    if (this.espPollInterval) {
+      clearInterval(this.espPollInterval);
+      this.espPollInterval = null;
+    }
+    
+    const led = document.getElementById('espLed');
+    if (led) {
+      led.className = "pulse-telemetry-led led-pulse-inactive";
+      led.style.background = "#6b7280";
+    }
+    const toggleText = document.getElementById('espToggleText');
+    if (toggleText) toggleText.textContent = "OFFLINE";
+    
+    // Reset reading displays
+    document.getElementById('espPir').textContent = "--";
+    document.getElementById('espPir').style.color = "";
+    document.getElementById('espRssi').textContent = "--";
+    document.getElementById('espRadarState').textContent = "--";
+    document.getElementById('espRadarState').style.color = "";
+    document.getElementById('espRadarDist').textContent = "--";
+    document.getElementById('espTemp').textContent = "--";
+    document.getElementById('espHumid').textContent = "--";
+    
+    this.playBeep(400, 0.1);
+  }
+
+  async pollTelemetry() {
+    try {
+      const res = await fetch('/api/telemetry');
+      if (res.ok) {
+        const data = await res.json();
+        const led = document.getElementById('espLed');
+        const toggleText = document.getElementById('espToggleText');
+        
+        if (data.active) {
+          // ESP32 is online and active
+          if (led) {
+            led.className = "pulse-telemetry-led led-pulse-active";
+            led.style.background = "#10b981";
+          }
+          if (toggleText) toggleText.textContent = "ONLINE";
+          
+          // Update details panel
+          document.getElementById('espPir').textContent = data.pir_motion === 1 ? "ACTIVE" : "CLEAR";
+          document.getElementById('espPir').style.color = data.pir_motion === 1 ? "#ef4444" : "#10b981";
+          
+          document.getElementById('espRssi').textContent = `${data.wifi_rssi} dBm`;
+          
+          let radarStateStr = "CLEAR";
+          if (data.radar_raw.state === 1) radarStateStr = "MOVING";
+          else if (data.radar_raw.state === 2) radarStateStr = "STATIC";
+          else if (data.radar_raw.state === 3) radarStateStr = "BOTH";
+          document.getElementById('espRadarState').textContent = radarStateStr;
+          document.getElementById('espRadarState').style.color = data.radar_raw.state > 0 ? "#ef4444" : "#10b981";
+          
+          document.getElementById('espRadarDist').textContent = `${(data.radar_raw.distance_cm / 100.0).toFixed(2)} M`;
+          document.getElementById('espTemp').textContent = `${data.environment_raw.temperature_c.toFixed(1)}°C`;
+          document.getElementById('espHumid').textContent = `${data.environment_raw.humidity_pct.toFixed(1)}%`;
+          
+          // Sync with ML input parameters
+          if (data.ml_inputs) {
+            this.params.breathing = parseFloat(data.ml_inputs.breathing_hz);
+            this.params.heartbeat = parseFloat(data.ml_inputs.heartbeat_hz);
+            this.params.depth = parseFloat(data.ml_inputs.reflection_depth);
+            this.params.microamp = parseFloat(data.ml_inputs.micro_amp);
+            this.params.snr = parseFloat(data.ml_inputs.snr_db);
+            this.params.moisture = parseFloat(data.ml_inputs.soil_moisture);
+            this.params.density = parseFloat(data.ml_inputs.soil_density);
+            this.params.dielectric = parseFloat(data.ml_inputs.dielectric_shift);
+            
+            // Sync slider display elements
+            if (this.syncUIFromParams) {
+              this.syncUIFromParams();
+            }
+            
+            // Run prediction and redraw charts silently
+            this.runLiveUpdate();
+          }
+        } else {
+          // Endpoint responded, but ESP32 hasn't posted recently (stale/disconnected)
+          if (led) {
+            led.className = "pulse-telemetry-led led-pulse-inactive";
+            led.style.background = "#eab308"; // Amber warning
+          }
+          if (toggleText) toggleText.textContent = "STALE (NO ESP)";
+          
+          // Gray out readings
+          document.getElementById('espPir').textContent = "--";
+          document.getElementById('espPir').style.color = "";
+          document.getElementById('espRssi').textContent = "--";
+          document.getElementById('espRadarState').textContent = "--";
+          document.getElementById('espRadarState').style.color = "";
+          document.getElementById('espRadarDist').textContent = "--";
+        }
+      }
+    } catch (e) {
+      console.warn("Error fetching live ESP32 telemetry:", e);
+    }
+  }
+
+  async runLiveUpdate() {
+    let data = null;
+    try {
+      const res = await fetch('/api/predict', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
+          micro_amp: this.params.microamp,    snr_db: this.params.snr,
+          dielectric_shift: this.params.dielectric, soil_moisture: this.params.moisture,
+          soil_density: this.params.density,  reflection_depth: this.params.depth
+        })
+      });
+
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        data = this._calculateClientPrediction();
+      }
+    } catch (e) {
+      console.warn('Backend API fetch error, using client-side AI engine fallback:', e);
+      data = this._calculateClientPrediction();
+    }
+
+    this.detectionResult = data;
+    const pred  = data.result;
+    const isHuman = pred.prediction === 1 || pred.human_detected === true;
+    const prob    = pred.consensus_probability_pct !== undefined ? pred.consensus_probability_pct : (pred.probability_percentage || 85.0);
+    const guidance = pred.rescue_guidance || {
+      urgency_level: "CRITICAL — Structural Support Required",
+      rescue_strategy: "Medium Rubble: Hydraulic Trench Shield & Micro-Tunnel Probe",
+      estimated_oxygen_hours: 14.5,
+      air_permeability_pct: 28
+    };
+    const oxyHours = guidance.estimated_oxygen_hours || 14.5;
+    const pal     = survivalColor(oxyHours);
+
+    // Gauge
+    const probValEl = document.getElementById('probabilityVal');
+    if (probValEl) probValEl.innerHTML = `${prob}<span class="probability-unit">%</span>`;
+    
+    const gaugeProgEl = document.getElementById('gaugeProgress');
+    if (gaugeProgEl) gaugeProgEl.style.strokeDashoffset = 565 - (prob/100)*565;
+
+    const banner = document.getElementById('detectionBanner');
+
+    let gpsText = "N/A - MATRIX CLEAR";
+
+    if (isHuman) {
+      // Deterministically map sector based on depth & vital characteristics
+      let detSec = SECTORS[0];
+      const hbBpm = Math.round(this.params.heartbeat * 60);
+      if (hbBpm > 95) detSec = SECTORS[1]; // Sector B (NE)
+      else if (this.params.depth >= 2.0 && this.params.depth <= 3.0) detSec = SECTORS[2]; // Sector C (SW)
+      else if (this.params.depth > 3.0) detSec = SECTORS[3]; // Sector D (SE)
+
+      // Apply small high-precision lat/lon offsets based on target quadrant
+      let latOff = 0.00018, lonOff = 0.00015;
+      if (detSec.id === 'A') { latOff *= 1; lonOff *= -1; }
+      else if (detSec.id === 'B') { latOff *= 1; lonOff *= 1; }
+      else if (detSec.id === 'C') { latOff *= -1; lonOff *= -1; }
+      else if (detSec.id === 'D') { latOff *= -1; lonOff *= 1; }
+
+      const vLat = this.gpsBase.lat + latOff;
+      const vLon = this.gpsBase.lon + lonOff;
+      gpsText = `${vLat.toFixed(6)}° N, ${Math.abs(vLon).toFixed(6)}° E`;
+
+      this._highlightSector(detSec.id, oxyHours);
+      this._updateTelemetryOverlay('DETECTED', detSec.id, oxyHours);
+      this._startOxygenCountdown(oxyHours);
+      this._updateSurvivalPanel(detSec, prob, oxyHours, guidance, pal);
+      this._updateSectorStatusPanel(detSec.id, prob, oxyHours);
+
+      if (banner) {
+        banner.className = 'detection-banner detected';
+        banner.style.borderColor = pal.str;
+        banner.style.color = pal.str;
+        banner.style.background = `rgba(${this._hexToRgb(pal.hex)},0.12)`;
+        banner.innerHTML = `
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          ⚠ ${detSec.label} — ${pal.label} — ${prob}% CONFIDENCE @ ${this.params.depth.toFixed(2)}m
+        `;
+      }
+    } else {
+      this._clearAllSectors();
+      this._stopOxygenCountdown();
+      this._resetSurvivalPanel();
+      this._updateTelemetryOverlay('CLEAR', null, null);
+      if (banner) {
+        banner.className = 'detection-banner clear';
+        banner.style.borderColor = '';
+        banner.style.color = '';
+        banner.style.background = '';
+        banner.innerHTML = `
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          CLEAR MATRIX — NO LIFE DETECTED IN ANY SECTOR
+        `;
+      }
+    }
+
+    this.currentGps = gpsText;
+    const gpsTextEl = document.getElementById('telemetryGpsText');
+    if (gpsTextEl) gpsTextEl.textContent = gpsText;
+
+    const depthEl = document.getElementById('telemetryDepth');
+    if (depthEl) depthEl.textContent = `${this.params.depth.toFixed(2)} M`;
+    
+    const vitalEl = document.getElementById('telemetryVital');
+    if (vitalEl) vitalEl.textContent = `${(this.params.breathing*60).toFixed(0)} bpm / ${(this.params.heartbeat*60).toFixed(0)} bpm`;
+    
+    const snrEl = document.getElementById('telemetrySnr');
+    if (snrEl) snrEl.textContent = `${this.params.snr.toFixed(1)} dB`;
+    
+    const dielEl = document.getElementById('telemetryDielectric');
+    if (dielEl) dielEl.textContent = `${this.params.dielectric.toFixed(1)} ε`;
+
+    this.updateHarmonicsWave();
+    this.updateDepthChart();
+    
+    const insightEl = document.getElementById('chartInsightText');
+    if (insightEl) insightEl.textContent = `Vitals: ${(this.params.breathing*60).toFixed(0)} breath / ${(this.params.heartbeat*60).toFixed(0)} pulse bpm — Oxygen ~${oxyHours.toFixed(1)} hrs`;
+
+    const advisoryEl = document.getElementById('rescueAdvisoryContent');
+    if (advisoryEl) {
+      advisoryEl.innerHTML = `
+        <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius-sm);padding:0.65rem 0.85rem;font-size:0.8rem;line-height:1.5;">
+          <strong style="color:var(--accent-emerald);font-family:var(--font-tech);font-size:0.85rem;display:block;margin-bottom:3px;">ACTION: ${guidance.urgency_level}</strong>
+          <strong>Strategy:</strong> ${guidance.rescue_strategy}<br>
+          <strong>Oxygen:</strong> ${oxyHours.toFixed(1)} hrs (${guidance.air_permeability_pct}% Air Permeability)
+        </div>
+      `;
+    }
+
+    const reportBox = document.getElementById('reportConsoleBox');
+    if (reportBox) {
+      reportBox.innerHTML = `
+        <div class="report-row"><span class="report-key">AI PREDICTION:</span> <span class="report-val">${isHuman?'HUMAN DETECTED':'CLEAR'} (${prob}%)</span></div>
+        <div class="report-row"><span class="report-key">BREATH RATE:</span>   <span class="report-val">${(this.params.breathing*60).toFixed(1)} bpm</span></div>
+        <div class="report-row"><span class="report-key">HEART RATE:</span>    <span class="report-val">${(this.params.heartbeat*60).toFixed(1)} bpm</span></div>
+        <div class="report-row"><span class="report-key">SIGNAL:</span>         <span class="report-val" style="color:var(--accent-emerald)">TARGET LOCKED</span></div>
+      `;
+    }
   }
 }
 

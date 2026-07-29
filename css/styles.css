@@ -27,10 +27,17 @@
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -44,6 +51,16 @@ body {
     radial-gradient(circle at 10% 10%, rgba(0, 242, 254, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 90% 90%, rgba(249, 115, 22, 0.03) 0%, transparent 40%);
   background-attachment: fixed;
+}
+
+/* GPU Hardware Acceleration Promotion */
+#canvas3d-container,
+.detection-banner,
+.esp32-telemetry-panel,
+.modal-card {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 /* Header Navbar with Glowing Border */
@@ -959,5 +976,37 @@ footer.app-footer {
   .modal-close-btn, #btnPrintModalReport, #btnDownloadJsonReport {
     display: none !important;
   }
+
 }
+
+/* --- Live ESP32 Telemetry CSS Styles --- */
+.custom-toggle-track {
+  display: inline-block;
+  vertical-align: middle;
+}
+#espTelemetryToggle:checked + .custom-toggle-track {
+  background: #10b981 !important;
+  border-color: #10b981 !important;
+}
+#espTelemetryToggle:checked + .custom-toggle-track .custom-toggle-thumb {
+  transform: translateX(14px);
+  background: #ffffff !important;
+}
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+@keyframes pulse-gray {
+  0% { box-shadow: 0 0 0 0 rgba(156, 163, 175, 0.4); }
+  70% { box-shadow: 0 0 0 4px rgba(156, 163, 175, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(156, 163, 175, 0); }
+}
+.led-pulse-active {
+  animation: pulse-green 1.5s infinite;
+}
+.led-pulse-inactive {
+  animation: pulse-gray 2s infinite;
+}
+
 

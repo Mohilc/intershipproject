@@ -33,16 +33,22 @@ ml_engine = SubsurfacePythonMLEngine()
 
 # --- LRU Prediction Cache ---
 @lru_cache(maxsize=128)
-def cached_predict(breathing_hz, heartbeat_hz, micro_amp, snr_db,
-                   dielectric_shift, soil_moisture, soil_density, reflection_depth):
+def cached_predict(breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
+                   micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
+                   dielectric_shift, soil_density, reflection_depth):
     """Cache predictions by rounding inputs to avoid near-duplicate computations."""
     feature_input = {
         'breathing_hz': breathing_hz,
         'heartbeat_hz': heartbeat_hz,
+        'pir_motion': pir_motion,
+        'radar_state': radar_state,
+        'radar_energy': radar_energy,
         'micro_amp': micro_amp,
         'snr_db': snr_db,
+        'bme_temp_c': bme_temp_c,
+        'bme_humidity_pct': bme_humidity_pct,
+        'bme_pressure_hpa': bme_pressure_hpa,
         'dielectric_shift': dielectric_shift,
-        'soil_moisture': soil_moisture,
         'soil_density': soil_density,
         'reflection_depth': reflection_depth
     }
@@ -78,6 +84,61 @@ def add_headers(response):
 
     return response
 
+# --- Global Live Telemetry Cache ---
+import time
+latest_telemetry = {
+    "node_id": "none",
+    "wifi_rssi": 0,
+    "pir_motion": 0,
+    "radar_raw": {
+        "state": 0,
+        "moving_energy": 0,
+        "static_energy": 0,
+        "distance_cm": 0
+    },
+    "environment_raw": {
+        "temperature_c": 20.0,
+        "humidity_pct": 30.0,
+        "pressure_hpa": 1013.25
+    },
+    "ml_inputs": {
+        "breathing_hz": 0.0,
+        "heartbeat_hz": 0.0,
+        "micro_amp": 0.0,
+        "snr_db": -12.0,
+        "dielectric_shift": 1.0,
+        "soil_moisture": 35.0,
+        "soil_density": 1600.0,
+        "reflection_depth": 0.0
+    },
+    "active": False,
+    "last_update": 0
+}
+
+@app.route('/api/telemetry', methods=['GET', 'POST', 'OPTIONS'])
+def handle_telemetry():
+    global latest_telemetry
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    if request.method == 'POST':
+        try:
+            data = request.get_json(force=True) or {}
+            latest_telemetry = data
+            latest_telemetry['active'] = True
+            latest_telemetry['last_update'] = time.time()
+            return jsonify({"status": "success", "message": "Telemetry received"}), 200
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 400
+
+    # GET logic
+    # Telemetry is marked stale and inactive if no updates have arrived in the last 7 seconds
+    current_time = time.time()
+    if latest_telemetry['active'] and (current_time - latest_telemetry.get('last_update', 0) > 7.0):
+        latest_telemetry['active'] = False
+
+    return jsonify(latest_telemetry), 200
+
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')
@@ -101,16 +162,22 @@ def predict_subsurface():
             def process_target(target_data):
                 breathing_hz = round(float(target_data.get('breathing_hz', 0.0)), 2)
                 heartbeat_hz = round(float(target_data.get('heartbeat_hz', 0.0)), 2)
+                pir_motion = float(target_data.get('pir_motion', 1 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+                radar_state = float(target_data.get('radar_state', 2 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+                radar_energy = round(float(target_data.get('radar_energy', 75.0 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0.0)), 1)
                 micro_amp = round(float(target_data.get('micro_amp', 0.0)), 2)
                 snr_db = round(float(target_data.get('snr_db', 0.0)), 2)
+                bme_temp_c = round(float(target_data.get('bme_temp_c', target_data.get('temperature_c', 25.0))), 1)
+                bme_humidity_pct = round(float(target_data.get('bme_humidity_pct', target_data.get('soil_moisture', 35.0))), 1)
+                bme_pressure_hpa = round(float(target_data.get('bme_pressure_hpa', target_data.get('pressure_hpa', 1013.25))), 1)
                 dielectric_shift = round(float(target_data.get('dielectric_shift', 0.0)), 2)
-                soil_moisture = round(float(target_data.get('soil_moisture', 35.0)), 1)
                 soil_density = round(float(target_data.get('soil_density', 1600.0)), 0)
                 reflection_depth = round(float(target_data.get('reflection_depth', 1.5)), 2)
 
                 res = cached_predict(
-                    breathing_hz, heartbeat_hz, micro_amp, snr_db,
-                    dielectric_shift, soil_moisture, soil_density, reflection_depth
+                    breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
+                    micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
+                    dielectric_shift, soil_density, reflection_depth
                 )
                 
                 if 'x' in target_data and 'y' in target_data and 'z' in target_data:
@@ -132,16 +199,22 @@ def predict_subsurface():
         # Single target fallback
         breathing_hz = round(float(data.get('breathing_hz', 0.0)), 2)
         heartbeat_hz = round(float(data.get('heartbeat_hz', 0.0)), 2)
+        pir_motion = float(data.get('pir_motion', 1 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+        radar_state = float(data.get('radar_state', 2 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+        radar_energy = round(float(data.get('radar_energy', 75.0 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0.0)), 1)
         micro_amp = round(float(data.get('micro_amp', 0.0)), 2)
         snr_db = round(float(data.get('snr_db', 0.0)), 2)
+        bme_temp_c = round(float(data.get('bme_temp_c', data.get('temperature_c', 25.0))), 1)
+        bme_humidity_pct = round(float(data.get('bme_humidity_pct', data.get('soil_moisture', 35.0))), 1)
+        bme_pressure_hpa = round(float(data.get('bme_pressure_hpa', data.get('pressure_hpa', 1013.25))), 1)
         dielectric_shift = round(float(data.get('dielectric_shift', 0.0)), 2)
-        soil_moisture = round(float(data.get('soil_moisture', 35.0)), 1)
         soil_density = round(float(data.get('soil_density', 1600.0)), 0)
         reflection_depth = round(float(data.get('reflection_depth', 1.5)), 2)
 
         prediction_result = cached_predict(
-            breathing_hz, heartbeat_hz, micro_amp, snr_db,
-            dielectric_shift, soil_moisture, soil_density, reflection_depth
+            breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
+            micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
+            dielectric_shift, soil_density, reflection_depth
         )
         
         return jsonify({
