@@ -34,8 +34,8 @@
 #include <ArduinoJson.h>
 
 // --- Configuration ---
-const char* ssid = "YOUR_SSID";             // Replace with your WiFi SSID
-const char* password = "YOUR_PASSWORD";     // Replace with your WiFi password
+const char* ssid = "snehaabiju";             // Replace with your WiFi SSID
+const char* password = "1234567890";     // Replace with your WiFi password
 const char* serverUrl = "http://192.168.1.100:3000/api/telemetry"; // Replace IP with Flask server host IP
 
 // --- Pin Definitions ---
