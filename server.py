@@ -2,6 +2,7 @@
 TERRA-SENSE AI - Flask Web Application & Prediction API Server
 Serves static files and runs subsurface detection predictions with CORS support.
 Performance optimized: LRU prediction caching, gzip compression, static asset caching.
+Includes: NVIDIA StreamPETR 3D human localizer for obstacle-proximity analysis.
 """
 
 from flask import Flask, request, jsonify, send_from_directory
@@ -31,11 +32,25 @@ app = Flask(__name__, static_folder='.')
 # Instantiate AI Engine (trains on startup)
 ml_engine = SubsurfacePythonMLEngine()
 
+# ── StreamPETR 3D Analyzer (lazy-loaded on first /api/streampetr call) ────────
+_streampetr_analyzer = None
+
+def get_streampetr():
+    global _streampetr_analyzer
+    if _streampetr_analyzer is None:
+        try:
+            from streampetr_3d import StreamPETRAnalyzer
+            _streampetr_analyzer = StreamPETRAnalyzer()
+            print("[Server] StreamPETR 3D Analyzer loaded.")
+        except Exception as e:
+            print(f"[Server] StreamPETR load warning: {e}")
+    return _streampetr_analyzer
+
 # --- LRU Prediction Cache ---
 @lru_cache(maxsize=128)
 def cached_predict(breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
                    micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
-                   dielectric_shift, soil_density, reflection_depth):
+                   dielectric_shift, soil_density, reflection_depth, grid_x=12.5, grid_y=8.2):
     """Cache predictions by rounding inputs to avoid near-duplicate computations."""
     feature_input = {
         'breathing_hz': breathing_hz,
@@ -50,7 +65,9 @@ def cached_predict(breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_en
         'bme_pressure_hpa': bme_pressure_hpa,
         'dielectric_shift': dielectric_shift,
         'soil_density': soil_density,
-        'reflection_depth': reflection_depth
+        'reflection_depth': reflection_depth,
+        'x': grid_x,
+        'y': grid_y
     }
     return ml_engine.predict(feature_input)
 
@@ -174,10 +191,13 @@ def predict_subsurface():
                 soil_density = round(float(target_data.get('soil_density', 1600.0)), 0)
                 reflection_depth = round(float(target_data.get('reflection_depth', 1.5)), 2)
 
+                grid_x = round(float(target_data.get('x', target_data.get('grid_x', 12.5))), 1)
+                grid_y = round(float(target_data.get('y', target_data.get('grid_y', 8.2))), 1)
+
                 res = cached_predict(
                     breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
                     micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
-                    dielectric_shift, soil_density, reflection_depth
+                    dielectric_shift, soil_density, reflection_depth, grid_x, grid_y
                 )
                 
                 if 'x' in target_data and 'y' in target_data and 'z' in target_data:
@@ -190,10 +210,13 @@ def predict_subsurface():
                 return res
 
             results = list(executor.map(process_target, data['targets']))
+            human_count = sum(1 for r in results if r.get('human_detected') is True)
                 
             return jsonify({
                 "status": "success",
-                "results": results
+                "results": results,
+                "human_count": human_count,
+                "total_targets": len(results)
             })
 
         # Single target fallback
@@ -210,11 +233,13 @@ def predict_subsurface():
         dielectric_shift = round(float(data.get('dielectric_shift', 0.0)), 2)
         soil_density = round(float(data.get('soil_density', 1600.0)), 0)
         reflection_depth = round(float(data.get('reflection_depth', 1.5)), 2)
+        grid_x = round(float(data.get('x', data.get('grid_x', 12.5))), 1)
+        grid_y = round(float(data.get('y', data.get('grid_y', 8.2))), 1)
 
         prediction_result = cached_predict(
             breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
             micro_amp, snr_db, bme_temp_c, bme_humidity_pct, bme_pressure_hpa,
-            dielectric_shift, soil_density, reflection_depth
+            dielectric_shift, soil_density, reflection_depth, grid_x, grid_y
         )
         
         return jsonify({
@@ -228,11 +253,78 @@ def predict_subsurface():
             "message": str(e)
         }), 400
 
+@app.route('/api/streampetr', methods=['POST', 'OPTIONS'])
+def streampetr_analyze():
+    """
+    NVIDIA StreamPETR 3D Human Localizer endpoint.
+    Accepts sensor feature dict + optional grid_x / grid_y position.
+    Returns 3D human position, obstacle proximity, entrapment posture,
+    rescue access direction, and top-down GPR heatmap preview (base64).
+
+    Request body (JSON):
+      Same sensor fields as /api/predict, plus optional:
+        grid_x  (float) — horizontal X position in metres
+        grid_y  (float) — horizontal Y position in metres
+
+    Response (JSON):
+      {
+        status: 'success',
+        streampetr: {
+          human_detected: bool,
+          confidence_pct: float,
+          position_3d: { x_m, y_m, depth_m },
+          obstacle_proximity_m: float,
+          obstacle_type: string,
+          entrapment_posture: string,
+          rescue_access_direction: string,
+          near_obstacle: bool,
+          under_obstacle: bool,
+          heatmap_preview_b64: string (JPEG base64 top-down view),
+          api_status: string
+        }
+      }
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    try:
+        data = request.get_json(force=True) or {}
+
+        # Extract sensor features
+        features = {
+            "breathing_hz":     float(data.get("breathing_hz",    0.0)),
+            "heartbeat_hz":     float(data.get("heartbeat_hz",    0.0)),
+            "micro_amp":        float(data.get("micro_amp",       0.0)),
+            "snr_db":           float(data.get("snr_db",          0.0)),
+            "pir_motion":       float(data.get("pir_motion",      0.0)),
+            "radar_state":      float(data.get("radar_state",     0.0)),
+            "radar_energy":     float(data.get("radar_energy",    0.0)),
+            "bme_temp_c":       float(data.get("bme_temp_c",     25.0)),
+            "bme_humidity_pct": float(data.get("bme_humidity_pct", 35.0)),
+            "bme_pressure_hpa": float(data.get("bme_pressure_hpa", 1013.25)),
+            "dielectric_shift": float(data.get("dielectric_shift",  0.0)),
+            "reflection_depth": float(data.get("reflection_depth",  1.5)),
+        }
+        grid_x = float(data.get("grid_x", data.get("x", 0.0)))
+        grid_y = float(data.get("grid_y", data.get("y", 0.0)))
+
+        analyzer = get_streampetr()
+        if analyzer is None:
+            return jsonify({"status": "error", "message": "StreamPETR module unavailable. Run: pip install Pillow"}), 503
+
+        result = analyzer.analyze(features, grid_x=grid_x, grid_y=grid_y)
+        return jsonify({"status": "success", "streampetr": result}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
+
 if __name__ == '__main__':
     print("\n=======================================================")
     print(" TERRA-SENSE AI - Subsurface Detection Server")
     print(" Running at: http://localhost:3000")
     print(f" AI Engine Accuracy: {ml_engine.accuracy_score:.2f}%")
     print(f" Prediction Cache: LRU (128 entries)")
+    print(" StreamPETR 3D: /api/streampetr  (lazy-loaded)")
     print("=======================================================\n")
     app.run(host='0.0.0.0', port=3000, debug=False)

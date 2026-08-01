@@ -66,6 +66,11 @@
 
     <div class="header-status-bar">
       <div class="status-pill">
+        <span>HOST IP:</span>
+        <input type="text" id="inputHostIp" placeholder="localhost" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff; border-radius: var(--radius-sm); padding: 2px 6px; font-family: var(--font-mono); font-size: 11px; width: 110px; outline: none;" />
+        <button id="btnApplyHostIp" style="background: var(--primary-cyan); border: none; color: #040711; font-weight: 700; border-radius: 2px; font-size: 10px; padding: 2px 6px; cursor: pointer;">SET</button>
+      </div>
+      <div class="status-pill">
         <span class="pulse-dot scanning" id="pulseDot"></span>
         <span>ARRAY STATUS: <strong id="headerArrayStatus" style="color: var(--primary-cyan)">READY FOR SCAN</strong></span>
       </div>
@@ -84,7 +89,7 @@
       <button class="btn-main btn-primary" id="btnInitiateScan">
         <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2">
           <circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/>
-        </svg>
+        </svg> 
         <span id="btnScanText">INITIATE SEARCH SCAN</span>
       </button>
 
@@ -136,6 +141,15 @@
         <span class="panel-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-emerald); border-color: rgba(16, 185, 129, 0.35);">MULTI-AI</span>
       </div>
 
+      <!-- Batch Human Detection Summary Panel -->
+      <div class="batch-summary-panel clear" id="batchSummaryPanel" style="display: none; margin-bottom: 0.9rem;">
+        <div class="batch-summary-details">
+          <span class="batch-title clear" id="batchSummaryTitle">MATRIX CLEAR</span>
+          <span class="batch-subtitle" id="batchSummarySubtitle">0 humans detected in scan grid</span>
+        </div>
+        <div class="batch-badge-counter clear" id="batchSummaryCount">0</div>
+      </div>
+
       <div class="prediction-card">
         <div class="gauge-wrapper">
           <svg class="gauge-svg" viewBox="0 0 200 200">
@@ -182,6 +196,34 @@
             <span id="telemetryGpsText">--</span>
             <button id="btnCopyGps" class="btn-preset-mini" style="margin: 0; padding: 2px 6px; font-size: 0.65rem;" title="Copy GPS Coordinates">COPY</button>
           </span>
+        </div>
+      </div>
+
+      <!-- Drone Status & GPS Telemetry HUD -->
+      <div class="drone-hud-card" id="droneHudCard" style="margin-top: 0.9rem;">
+        <div class="drone-hud-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+          SAR DRONE TELEMETRY HUD
+        </div>
+        <div class="drone-hud-grid">
+          <div class="drone-hud-item">
+            <span class="drone-hud-label">DRONE ALTITUDE</span>
+            <span class="drone-hud-val" id="droneAltitudeVal">10.0 M</span>
+          </div>
+          <div class="drone-hud-item">
+            <span class="drone-hud-label">FLIGHT STATUS</span>
+            <span class="drone-hud-val" id="droneStatusVal" style="color: var(--accent-emerald);">SCANNING ORBIT</span>
+          </div>
+          <div class="drone-hud-item">
+            <span class="drone-hud-label">DRONE LATITUDE</span>
+            <span class="drone-hud-val" id="droneLatitudeVal">28.613928</span>
+          </div>
+          <div class="drone-hud-item">
+            <span class="drone-hud-label">DRONE LONGITUDE</span>
+            <span class="drone-hud-val" id="droneLongitudeVal">77.209060</span>
+          </div>
         </div>
       </div>
 
@@ -273,7 +315,64 @@
         </div>
       </div>
 
+      <!-- Subsurface Person Positioning & Precision Inspector -->
+      <div class="subsurface-inspector-card" id="subsurfaceInspectorCard" style="margin-top: 0.9rem;">
+        <div class="subsurface-header">
+          <div class="subsurface-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M4.93 19.07l14.14-14.14"/>
+            </svg>
+            SUBSURFACE PERSON LOCATOR & DIAGNOSTICS
+          </div>
+          <div class="precision-badge-glow" id="subsurfacePrecisionBadge">PRECISION: 100.0%</div>
+        </div>
 
+        <div class="subsurface-locator-grid">
+          <!-- Subsurface Depth Cross Section Visualizer -->
+          <div class="subsurface-depth-cross-section">
+            <div class="subsurface-stratum-label">
+              <span>SOIL DEPTH PROFILE</span>
+              <span id="subsurfaceCategoryText" style="color: var(--accent-emerald);">LIVE TRAPPED VICTIM</span>
+            </div>
+            <div class="stratum-visual-layers">
+              <div class="soil-surface-line" title="Ground Surface Line"></div>
+              <div class="buried-person-marker" id="buriedPersonMarker" style="top: 45%;">
+                <div class="buried-person-icon" title="Buried Victim Location">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+                <div class="buried-depth-indicator" id="buriedDepthText">Z = -1.85m</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Posture & Soil Stratum Grid -->
+          <div>
+            <div class="subsurface-posture-badge" id="subsurfacePostureText">
+              POSTURE: Supine in Subsurface Air Void
+            </div>
+            <div class="stratum-matrix-grid">
+              <div class="stratum-stat-box">
+                <span class="stratum-stat-key">GRID (X, Y)</span>
+                <span class="stratum-stat-val" id="subsurfaceCoordsText">X:14.2m | Y:9.6m</span>
+              </div>
+              <div class="stratum-stat-box">
+                <span class="stratum-stat-key">AIR POCKET VOL</span>
+                <span class="stratum-stat-val" id="subsurfaceAirVolText">1.02 m³</span>
+              </div>
+              <div class="stratum-stat-box">
+                <span class="stratum-stat-key">CHEST DISPLACE</span>
+                <span class="stratum-stat-val" id="subsurfaceDisplaceText">3.78 mm</span>
+              </div>
+              <div class="stratum-stat-box">
+                <span class="stratum-stat-key">RADAR ATTEN</span>
+                <span class="stratum-stat-val" id="subsurfaceAttenText">21.8 dB/m</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </section>
 
