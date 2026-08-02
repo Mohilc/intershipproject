@@ -1937,15 +1937,20 @@ class TerraSenseApp {
   }
 
   _updateSubsurfaceInspector(pred, isHuman, prob) {
-    const badgeEl    = document.getElementById('subsurfacePrecisionBadge');
-    const categoryEl = document.getElementById('subsurfaceCategoryText');
-    const markerEl   = document.getElementById('buriedPersonMarker');
-    const depthText  = document.getElementById('buriedDepthText');
-    const postureEl  = document.getElementById('subsurfacePostureText');
-    const coordsEl   = document.getElementById('subsurfaceCoordsText');
-    const airVolEl   = document.getElementById('subsurfaceAirVolText');
-    const displaceEl = document.getElementById('subsurfaceDisplaceText');
-    const attenEl    = document.getElementById('subsurfaceAttenText');
+    const badgeEl     = document.getElementById('subsurfacePrecisionBadge');
+    const categoryEl  = document.getElementById('subsurfaceCategoryText');
+    const markerEl    = document.getElementById('buriedPersonMarker');
+    const depthText   = document.getElementById('buriedDepthText');
+    const postureEl   = document.getElementById('subsurfacePostureText');
+    const coordsEl    = document.getElementById('subsurfaceCoordsText');
+    const airVolEl    = document.getElementById('subsurfaceAirVolText');
+    const displaceEl  = document.getElementById('subsurfaceDisplaceText');
+    const attenEl     = document.getElementById('subsurfaceAttenText');
+    
+    // Newly added elements
+    const probeLineEl   = document.getElementById('subsurfaceProbeLine');
+    const targetAlertEl = document.getElementById('noTargetAlert');
+    const soilBadgeEl   = document.getElementById('soilStratumTypeBadge');
 
     if (!badgeEl) return;
 
@@ -1962,6 +1967,7 @@ class TerraSenseApp {
 
     const soilMat  = pred?.soil_stratum_matrix || {};
     const atten    = soilMat.attenuation_db_m !== undefined ? soilMat.attenuation_db_m : (3.5 + (this.params.moisture * 0.18)).toFixed(1);
+    const soilType = soilMat.soil_stratum_type || (this.params.moisture > 45 ? "Wet Silty Clay (High Radar Attenuation)" : (this.params.moisture < 25 ? "Sandy Loam Matrix (Good Radar Penetration)" : "Compact Soil & Rubble Mix"));
 
     badgeEl.textContent = `PRECISION: ${precisionScore.toFixed(1)}%`;
     badgeEl.className = isHuman ? 'precision-badge-glow' : 'precision-badge-glow warning';
@@ -1969,9 +1975,41 @@ class TerraSenseApp {
     categoryEl.textContent = category.toUpperCase();
     categoryEl.style.color = isHuman ? 'var(--accent-emerald)' : 'var(--accent-amber)';
 
-    const topPct = Math.min(82, Math.max(18, (depth / 5.0) * 100));
-    if (markerEl) markerEl.style.top = `${topPct}%`;
-    if (depthText) depthText.textContent = `Z = -${depth.toFixed(2)}m`;
+    // Compute top position percentage for depth mapping (0m is top of container, 5m is bottom)
+    // Surface line is located at 10px (approx 8% height of 125px)
+    // Dynamic mapping from 8% to 84% height
+    const topPct = Math.min(84, Math.max(8, 8 + (depth / 5.0) * 76));
+
+    if (isHuman) {
+      if (markerEl) {
+        markerEl.style.display = 'flex';
+        markerEl.style.top = `${topPct}%`;
+      }
+      if (probeLineEl) {
+        probeLineEl.style.display = 'block';
+        probeLineEl.style.height = `${topPct - 8}%`; // Stretch down from surface line (8%)
+      }
+      if (targetAlertEl) {
+        targetAlertEl.style.display = 'none';
+      }
+      if (depthText) {
+        depthText.textContent = `Z = -${depth.toFixed(2)}m`;
+      }
+    } else {
+      if (markerEl) {
+        markerEl.style.display = 'none';
+      }
+      if (probeLineEl) {
+        probeLineEl.style.display = 'none';
+      }
+      if (targetAlertEl) {
+        targetAlertEl.style.display = 'flex';
+      }
+    }
+
+    if (soilBadgeEl) {
+      soilBadgeEl.textContent = `SOIL CLASSIFICATION: ${soilType.toUpperCase()}`;
+    }
 
     if (postureEl) postureEl.textContent = `POSTURE: ${posture}`;
     if (coordsEl) coordsEl.textContent = `X:${gridCoords.x}m | Y:${gridCoords.y}m`;

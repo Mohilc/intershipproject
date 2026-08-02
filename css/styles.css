@@ -1119,19 +1119,131 @@ footer.app-footer {
   justify-content: space-between;
 }
 .stratum-visual-layers {
-  height: 90px;
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 40%, #060b19 100%);
+  height: 125px;
+  background: #0b0f19;
   border-radius: var(--radius-sm);
   position: relative;
   overflow: hidden;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.6);
+}
+.soil-layer-topsoil {
+  position: absolute;
+  top: 10px; left: 0; right: 0;
+  height: 18px;
+  background: linear-gradient(180deg, #2e2015 0%, #241910 100%);
+  opacity: 0.85;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+}
+.soil-layer-clay {
+  position: absolute;
+  top: 28px; left: 0; right: 0;
+  height: 39px;
+  background: linear-gradient(180deg, #452b1b 0%, #362215 100%);
+  opacity: 0.85;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.3);
+}
+.soil-layer-bedrock {
+  position: absolute;
+  top: 67px; left: 0; right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #1c1d22 0%, #111215 100%);
+  opacity: 0.85;
+}
+.soil-grid-hatch {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 15px 15px;
+  pointer-events: none;
+  z-index: 1;
+}
+.depth-ruler {
+  position: absolute;
+  left: 8px; top: 10px; bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.45);
+  pointer-events: none;
+  z-index: 3;
+}
+.depth-ruler span {
+  display: flex;
+  align-items: center;
+}
+.depth-ruler span::after {
+  content: "";
+  display: inline-block;
+  width: 4px; height: 1px;
+  background: rgba(255, 255, 255, 0.3);
+  margin-left: 4px;
 }
 .soil-surface-line {
   position: absolute;
   top: 10px; left: 0; right: 0;
   height: 2px;
-  background: #38ef7d;
-  box-shadow: 0 0 8px #38ef7d;
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
+  z-index: 2;
+}
+.subsurface-probe-line {
+  position: absolute;
+  left: 50%; top: 10px;
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, transparent, transparent 3px, #00f2fe 3px, #00f2fe 6px);
+  transition: height 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+  transform: translateX(-50%);
+}
+.air-cavity-ring {
+  position: absolute;
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 1px dashed rgba(0, 242, 254, 0.3);
+  background: radial-gradient(circle, rgba(0, 242, 254, 0.12) 0%, rgba(0, 242, 254, 0) 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  animation: pulseAirCavity 2.2s infinite ease-in-out;
+  pointer-events: none;
+}
+@keyframes pulseAirCavity {
+  0% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.4; }
+  50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.4; }
+}
+.no-target-alert {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(11, 15, 25, 0.85);
+  font-family: var(--font-tech);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent-amber);
+  text-align: center;
+  padding: 1.5rem;
+  letter-spacing: 0.5px;
+  z-index: 4;
+}
+.soil-stratum-type-badge {
+  margin-top: 0.5rem;
+  font-family: var(--font-tech);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-xs);
+  display: inline-block;
+  letter-spacing: 0.5px;
 }
 .buried-person-marker {
   position: absolute;

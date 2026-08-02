@@ -335,15 +335,47 @@
               <span id="subsurfaceCategoryText" style="color: var(--accent-emerald);">LIVE TRAPPED VICTIM</span>
             </div>
             <div class="stratum-visual-layers">
-              <div class="soil-surface-line" title="Ground Surface Line"></div>
+              <!-- Soil Strata Visual Background -->
+              <div class="soil-layer-topsoil" title="Organic Topsoil (0.0m - 0.8m)"></div>
+              <div class="soil-layer-clay" title="Sandy Clay Matrix (0.8m - 2.5m)"></div>
+              <div class="soil-layer-bedrock" title="Dense Bedrock Layer (2.5m - 5.0m)"></div>
+              <div class="soil-grid-hatch"></div>
+
+              <!-- Depth Ruler / Scale markings -->
+              <div class="depth-ruler">
+                <span>0m</span>
+                <span>-1m</span>
+                <span>-2m</span>
+                <span>-3m</span>
+                <span>-4m</span>
+                <span>-5m</span>
+              </div>
+
+              <!-- Surface level green indicator -->
+              <div class="soil-surface-line" title="Ground Surface Line (0.0m)"></div>
+
+              <!-- Subsurface Probe Guide Line -->
+              <div class="subsurface-probe-line" id="subsurfaceProbeLine" style="height: 35%;"></div>
+
+              <!-- Buried Person Target Marker -->
               <div class="buried-person-marker" id="buriedPersonMarker" style="top: 45%;">
-                <div class="buried-person-icon" title="Buried Victim Location">
+                <div class="air-cavity-ring" id="airCavityRing"></div>
+                <div class="buried-person-icon" title="Detected Victim position">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                   </svg>
                 </div>
                 <div class="buried-depth-indicator" id="buriedDepthText">Z = -1.85m</div>
               </div>
+
+              <!-- NO target scan alert text -->
+              <div class="no-target-alert" id="noTargetAlert" style="display: none;">
+                NO SUBSURFACE BIOMASS DETECTED IN SCAN SECTOR
+              </div>
+            </div>
+            <!-- Dynamic Soil Stratum Badge -->
+            <div class="soil-stratum-type-badge" id="soilStratumTypeBadge">
+              SOIL TYPE: Sandy Loam Matrix
             </div>
           </div>
 
