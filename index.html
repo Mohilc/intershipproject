@@ -284,6 +284,69 @@
         </div>
       </div>
 
+      <!-- ESP32 Live Telemetry Integration Dashboard (Positioned under 3D Model) -->
+      <div class="esp32-telemetry-panel" style="margin-top: 1.1rem; margin-bottom: 0.9rem; padding: 0.9rem; background: rgba(16, 20, 30, 0.6); border: 1px solid rgba(0, 242, 254, 0.15); border-radius: 6px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px dashed rgba(0, 242, 254, 0.15); padding-bottom: 0.4rem;">
+          <div style="display: flex; align-items: center;">
+            <span class="pulse-telemetry-led led-pulse-inactive" id="espLed" style="width: 8px; height: 8px; border-radius: 50%; background: #6b7280; display: inline-block; margin-right: 0.45rem;"></span>
+            <strong style="color: var(--primary-cyan); font-size: 0.8rem; font-family: var(--font-mono); letter-spacing: 0.5px;">LIVE ESP32 SENSORS</strong>
+          </div>
+          <label class="switch-container" style="display: inline-flex; align-items: center; cursor: pointer;">
+            <span style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono); margin-right: 0.35rem;" id="espToggleText">OFFLINE</span>
+            <input type="checkbox" id="espTelemetryToggle">
+            <div class="custom-toggle-track" style="width: 32px; height: 16px; background: rgba(255,255,255,0.1); border-radius: 10px; position: relative; border: 1px solid rgba(255,255,255,0.2); transition: 0.3s; margin-left: 0.2rem;">
+              <div class="custom-toggle-thumb" style="width: 12px; height: 12px; background: #9ca3af; border-radius: 50%; position: absolute; top: 1px; left: 1px; transition: 0.3s;"></div>
+            </div>
+          </label>
+        </div>
+        
+        <div id="espTelemetryDetails" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem; font-size: 0.7rem; font-family: var(--font-mono);">
+          <div style="color: var(--text-muted);">PIR: <span id="espPir" style="color: #fff; font-weight: bold;">--</span></div>
+          <div style="color: var(--text-muted);">RSSI: <span id="espRssi" style="color: #fff; font-weight: bold;">--</span></div>
+          <div style="color: var(--text-muted);">Radar: <span id="espRadarState" style="color: #fff; font-weight: bold;">--</span></div>
+          <div style="color: var(--text-muted);">Range: <span id="espRadarDist" style="color: #fff; font-weight: bold;">--</span></div>
+          <div style="color: var(--text-muted);">Temp: <span id="espTemp" style="color: #fff; font-weight: bold;">--</span></div>
+          <div style="color: var(--text-muted);">Humid: <span id="espHumid" style="color: #fff; font-weight: bold;">--</span></div>
+        </div>
+      </div>
+
+      <!-- ESP32-CAM Live Video Stream & Optical AI Node -->
+      <div class="esp32-cam-panel" style="margin-top: 1.1rem; margin-bottom: 0.9rem; padding: 0.9rem; background: rgba(16, 20, 30, 0.6); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 6px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px dashed rgba(0, 242, 254, 0.2); padding-bottom: 0.4rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--primary-cyan);"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <strong style="color: var(--primary-cyan); font-size: 0.8rem; font-family: var(--font-mono); letter-spacing: 0.5px;">ESP32-CAM OPTICAL AI NODE</strong>
+          </div>
+          <button id="btnCamModelInfo" class="btn-preset-mini" style="font-size: 0.65rem; padding: 2px 6px; margin: 0;" title="View ESP32 Camera Models & Pinouts">PINOUTS</button>
+        </div>
+
+        <!-- Video Stream Container -->
+        <div class="cam-stream-container" style="position: relative; width: 100%; height: 160px; background: #000; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.1);">
+          <img id="espCamStreamImg" src="" alt="ESP32-CAM Live Feed" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+          <div id="espCamPlaceholder" style="text-align: center; color: var(--text-muted); font-size: 0.75rem; font-family: var(--font-mono); padding: 0.5rem;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 0.4rem; display: block; opacity: 0.5;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            <span id="espCamStatusText">CAMERA NODE OFFLINE</span>
+          </div>
+          <div id="espCamOverlayBadge" style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); border: 1px solid var(--border-color); border-radius: 3px; padding: 2px 6px; font-family: var(--font-mono); font-size: 0.65rem; color: #fff; display: flex; align-items: center; gap: 4px;">
+            <span id="espCamDot" style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; display: inline-block;"></span>
+            <span id="espCamModelBadge">AI-THINKER</span>
+          </div>
+        </div>
+
+        <!-- Controls Toolbar -->
+        <div style="margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.4rem;">
+          <div style="display: flex; gap: 0.4rem;">
+            <input type="text" id="inputCamIp" placeholder="http://192.168.4.1/stream" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 3px 6px; font-family: var(--font-mono); font-size: 0.7rem; outline: none;" />
+            <button id="btnConnectCam" style="background: var(--primary-cyan); border: none; color: #040711; font-weight: 700; border-radius: 3px; font-size: 0.68rem; padding: 3px 8px; cursor: pointer;">CONNECT</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; gap: 0.4rem;">
+            <button id="btnToggleFlash" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 3px 4px; font-size: 0.65rem;" title="Toggle Onboard Flash LED">FLASH LIGHT</button>
+            <button id="btnCaptureSnapshot" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 3px 4px; font-size: 0.65rem;" title="Capture Frame for AI Analysis">SNAPSHOT</button>
+            <button id="btnDemoCamStream" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 3px 4px; font-size: 0.65rem;" title="Toggle Synthetic Demo Stream">DEMO FEED</button>
+          </div>
+        </div>
+      </div>
+
       <!-- 4-Sector Status Panel -->
       <div style="margin-top:0.9rem; border-top:1px solid rgba(255,255,255,0.07); padding-top:0.75rem;">
         <div style="font-family:var(--font-tech);font-size:0.88rem;font-weight:700;color:var(--primary-cyan);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.4rem;">
@@ -520,32 +583,6 @@
           </div>
         </div>
 
-        <!-- ESP32 Live Telemetry Integration Dashboard -->
-        <div class="esp32-telemetry-panel" style="margin-top: 1.1rem; margin-bottom: 0.9rem; padding: 0.9rem; background: rgba(16, 20, 30, 0.6); border: 1px solid rgba(0, 242, 254, 0.15); border-radius: 6px; box-shadow: 0 0 15px rgba(0, 0, 0, 0.4);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; border-bottom: 1px dashed rgba(0, 242, 254, 0.15); padding-bottom: 0.4rem;">
-            <div style="display: flex; align-items: center;">
-              <span class="pulse-telemetry-led led-pulse-inactive" id="espLed" style="width: 8px; height: 8px; border-radius: 50%; background: #6b7280; display: inline-block; margin-right: 0.45rem;"></span>
-              <strong style="color: var(--primary-cyan); font-size: 0.8rem; font-family: var(--font-mono); letter-spacing: 0.5px;">LIVE ESP32 SENSORS</strong>
-            </div>
-            <label class="switch-container" style="display: inline-flex; align-items: center; cursor: pointer;">
-              <span style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono); margin-right: 0.35rem;" id="espToggleText">OFFLINE</span>
-              <input type="checkbox" id="espTelemetryToggle">
-              <div class="custom-toggle-track" style="width: 32px; height: 16px; background: rgba(255,255,255,0.1); border-radius: 10px; position: relative; border: 1px solid rgba(255,255,255,0.2); transition: 0.3s; margin-left: 0.2rem;">
-                <div class="custom-toggle-thumb" style="width: 12px; height: 12px; background: #9ca3af; border-radius: 50%; position: absolute; top: 1px; left: 1px; transition: 0.3s;"></div>
-              </div>
-            </label>
-          </div>
-          
-          <div id="espTelemetryDetails" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem 0.6rem; font-size: 0.7rem; font-family: var(--font-mono);">
-            <div style="color: var(--text-muted);">PIR: <span id="espPir" style="color: #fff; font-weight: bold;">--</span></div>
-            <div style="color: var(--text-muted);">RSSI: <span id="espRssi" style="color: #fff; font-weight: bold;">--</span></div>
-            <div style="color: var(--text-muted);">Radar: <span id="espRadarState" style="color: #fff; font-weight: bold;">--</span></div>
-            <div style="color: var(--text-muted);">Range: <span id="espRadarDist" style="color: #fff; font-weight: bold;">--</span></div>
-            <div style="color: var(--text-muted);">Temp: <span id="espTemp" style="color: #fff; font-weight: bold;">--</span></div>
-            <div style="color: var(--text-muted);">Humid: <span id="espHumid" style="color: #fff; font-weight: bold;">--</span></div>
-          </div>
-        </div>
-
         <button class="btn-main btn-secondary" id="btnLoadSampleCsv" style="width: 100%; justify-content: center; margin-bottom: 0.9rem; font-weight: 700; border-color: rgba(0, 242, 254, 0.4); text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 0.35rem;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           RUN TEST DEMO SCAN
@@ -585,6 +622,75 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           DOWNLOAD JSON DATA
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESP32-CAM Camera Model & Pinouts Reference Modal -->
+  <div class="modal-overlay" id="camModelModal" style="display: none;">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="modal-title">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          ESP32 CAMERA MODELS & HARDWARE PINOUTS
+        </div>
+        <button class="modal-close-btn" id="btnCloseCamModelModal">&times;</button>
+      </div>
+
+      <div class="modal-body" style="font-size: 0.8rem; font-family: var(--font-mono); color: var(--text-main); max-height: 70vh; overflow-y: auto; padding: 1rem;">
+        <p style="margin-bottom: 1rem; color: var(--text-muted); line-height: 1.5;">
+          Select the active hardware model macro in <code style="color: var(--primary-cyan)">esp32_cam_firmware.ino</code>:
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0, 242, 254, 0.25); border-radius: 4px; padding: 0.75rem;">
+            <div style="font-weight: 700; color: var(--primary-cyan); margin-bottom: 0.4rem;">1. AI-THINKER ESP32-CAM</div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.4;">
+              • Macro: <code style="color:#fff">CAMERA_MODEL_AI_THINKER</code><br>
+              • PSRAM: Enabled (640x480 VGA)<br>
+              • PWDN: 32 | RESET: -1 | XCLK: 0<br>
+              • SIOD: 26 | SIOC: 27 | Flash LED: GPIO 4<br>
+              • Data Y2-Y9: 5, 18, 19, 21, 36, 39, 34, 35
+            </div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 4px; padding: 0.75rem;">
+            <div style="font-weight: 700; color: var(--accent-emerald); margin-bottom: 0.4rem;">2. ESP-EYE</div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.4;">
+              • Macro: <code style="color:#fff">CAMERA_MODEL_ESP_EYE</code><br>
+              • PSRAM: Enabled<br>
+              • PWDN: -1 | RESET: -1 | XCLK: 4<br>
+              • SIOD: 18 | SIOC: 23 | Status LED: GPIO 21<br>
+              • Data Y2-Y9: 34, 13, 14, 35, 39, 38, 37, 36
+            </div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(251, 191, 36, 0.25); border-radius: 4px; padding: 0.75rem;">
+            <div style="font-weight: 700; color: var(--accent-amber); margin-bottom: 0.4rem;">3. WROVER-KIT</div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.4;">
+              • Macro: <code style="color:#fff">CAMERA_MODEL_WROVER_KIT</code><br>
+              • PSRAM: Enabled<br>
+              • PWDN: -1 | RESET: -1 | XCLK: 21<br>
+              • SIOD: 26 | SIOC: 27<br>
+              • Data Y2-Y9: 4, 5, 18, 19, 36, 39, 34, 35
+            </div>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 4px; padding: 0.75rem;">
+            <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.4rem;">4. SEEED XIAO ESP32S3</div>
+            <div style="color: var(--text-muted); font-size: 0.72rem; line-height: 1.4;">
+              • Macro: <code style="color:#fff">CAMERA_MODEL_XIAO_ESP32S3</code><br>
+              • PSRAM: 8MB Octal PSRAM<br>
+              • PWDN: -1 | RESET: -1 | XCLK: 10<br>
+              • SIOD: 40 | SIOC: 39<br>
+              • Data Y2-Y9: 15, 17, 18, 16, 14, 12, 11, 48
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-main btn-secondary" id="btnCloseCamModelModal2">CLOSE</button>
       </div>
     </div>
   </div>

@@ -95,6 +95,7 @@ class TerraSenseApp {
     this.initThree();
     this.initCharts();
     this.initHumanControls();
+    this.initCameraFeed();
     this.bindEvents();
     
     // Load Host IP from local storage
@@ -233,6 +234,141 @@ class TerraSenseApp {
         this.startScanSequence();
       });
     });
+  }
+
+  initCameraFeed() {
+    const inputCamIp = document.getElementById('inputCamIp');
+    const btnConnect = document.getElementById('btnConnectCam');
+    const btnFlash = document.getElementById('btnToggleFlash');
+    const btnSnapshot = document.getElementById('btnCaptureSnapshot');
+    const btnDemo = document.getElementById('btnDemoCamStream');
+    const imgStream = document.getElementById('espCamStreamImg');
+    const placeholder = document.getElementById('espCamPlaceholder');
+    const statusText = document.getElementById('espCamStatusText');
+    const dot = document.getElementById('espCamDot');
+    const btnPinouts = document.getElementById('btnCamModelInfo');
+    const modal = document.getElementById('camModelModal');
+    const btnCloseModal = document.getElementById('btnCloseCamModelModal');
+    const btnCloseModal2 = document.getElementById('btnCloseCamModelModal2');
+
+    let flashOn = false;
+    let isDemoMode = false;
+
+    // Load saved Cam IP
+    const savedCamUrl = localStorage.getItem('terra_sense_cam_url');
+    if (savedCamUrl && inputCamIp) {
+      inputCamIp.value = savedCamUrl;
+    }
+
+    const setStatus = (online, text) => {
+      if (dot) dot.style.background = online ? 'var(--accent-emerald)' : '#9ca3af';
+      if (statusText) statusText.textContent = text;
+    };
+
+    const connectStream = (url) => {
+      if (!url) return;
+      localStorage.setItem('terra_sense_cam_url', url);
+      setStatus(true, 'CONNECTING STREAM...');
+      
+      if (imgStream) {
+        imgStream.src = url;
+        imgStream.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+      }
+
+      if (imgStream) {
+        imgStream.onerror = () => {
+          setStatus(false, 'STREAM OFFLINE / TIMEOUT');
+          imgStream.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'block';
+        };
+        imgStream.onload = () => {
+          setStatus(true, 'LIVE OPTICAL FEED ONLINE');
+        };
+      }
+    };
+
+    if (btnConnect && inputCamIp) {
+      btnConnect.addEventListener('click', () => {
+        isDemoMode = false;
+        connectStream(inputCamIp.value.trim());
+      });
+    }
+
+    // Flash Light
+    if (btnFlash) {
+      btnFlash.addEventListener('click', () => {
+        flashOn = !flashOn;
+        btnFlash.classList.toggle('active', flashOn);
+        const camIp = inputCamIp ? inputCamIp.value.trim() : '';
+        if (camIp) {
+          const baseUrl = camIp.replace(/\/stream.*$/, '');
+          const targetLedUrl = `${baseUrl}/led?state=${flashOn ? 'on' : 'off'}`;
+          fetch(`/api/camera/proxy?url=${encodeURIComponent(targetLedUrl)}`)
+            .catch(err => console.warn('Flash command error:', err));
+        }
+      });
+    }
+
+    // Snapshot Capture
+    if (btnSnapshot) {
+      btnSnapshot.addEventListener('click', () => {
+        const camIp = inputCamIp ? inputCamIp.value.trim() : '';
+        this.playBeep(880, 0.15);
+        if (camIp) {
+          const baseUrl = camIp.replace(/\/stream.*$/, '');
+          const captureUrl = `${baseUrl}/capture`;
+          fetch(`/api/camera/proxy?url=${encodeURIComponent(captureUrl)}`)
+            .then(res => res.blob())
+            .then(blob => {
+              const objUrl = URL.createObjectURL(blob);
+              if (imgStream) {
+                imgStream.src = objUrl;
+                imgStream.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+              }
+              setStatus(true, 'SNAPSHOT CAPTURED');
+            })
+            .catch(() => setStatus(false, 'SNAPSHOT FAILED'));
+        } else {
+          alert("Please enter a valid ESP32-CAM URL first.");
+        }
+      });
+    }
+
+    // Demo Stream Toggle
+    if (btnDemo) {
+      btnDemo.addEventListener('click', () => {
+        isDemoMode = !isDemoMode;
+        btnDemo.classList.toggle('active', isDemoMode);
+        if (isDemoMode) {
+          if (imgStream) {
+            const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">DEMO OPTICAL FEED (640x480)</text></svg>`;
+            imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
+            imgStream.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+          }
+          setStatus(true, 'SYNTHETIC DEMO STREAM');
+        } else {
+          if (imgStream) imgStream.style.display = 'none';
+          if (placeholder) placeholder.style.display = 'block';
+          setStatus(false, 'CAMERA NODE OFFLINE');
+        }
+      });
+    }
+
+    // Modal controls
+    if (btnPinouts && modal) {
+      btnPinouts.addEventListener('click', () => modal.style.display = 'flex');
+    }
+    const closeModal = () => { if (modal) modal.style.display = 'none'; };
+    if (btnCloseModal) btnCloseModal.addEventListener('click', closeModal);
+    if (btnCloseModal2) btnCloseModal2.addEventListener('click', closeModal);
+    if (modal) {
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════

@@ -156,6 +156,27 @@ def handle_telemetry():
 
     return jsonify(latest_telemetry), 200
 
+@app.route('/api/camera/proxy', methods=['GET', 'POST', 'OPTIONS'])
+def camera_proxy():
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    target_url = request.args.get('url')
+    if not target_url:
+        return jsonify({"status": "error", "message": "Missing target 'url' parameter"}), 400
+
+    try:
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or {}
+            resp = requests.post(target_url, json=data, timeout=5)
+        else:
+            resp = requests.get(target_url, timeout=5)
+
+        content_type = resp.headers.get('Content-Type', 'text/plain')
+        return (resp.content, resp.status_code, {'Content-Type': content_type, 'Access-Control-Allow-Origin': '*'})
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Camera node offline or unreachable: {str(e)}"}), 502
+
 @app.route('/')
 def serve_index():
     return send_from_directory('.', 'index.html')

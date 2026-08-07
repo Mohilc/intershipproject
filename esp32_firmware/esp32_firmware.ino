@@ -1,7 +1,7 @@
 /**
  * TERRA-SENSE AI - ESP32 Sensor Node Firmware (Arduino C++)
  * Mode: WiFi Access Point (Hotspot) + Built-in Web Server
- * Configured for: PIR Motion Sensor + BMP180 Environmental Sensor
+ * Configured for: PIR Motion Sensor + BME690 Multi-Environmental Sensor
  * 
  * How it works:
  * - ESP32 creates its own WiFi network (hotspot)
@@ -10,8 +10,8 @@
  * - Data updates every 1 second automatically
  * 
  * Hardware Pins & Wiring:
- * 1. BMP180 (I2C):
- *    - VCC -> 3.3V (Do NOT connect to 5V; BMP180 operates on 3.3V)
+ * 1. BME690 (I2C):
+ *    - VCC -> 3.3V (Do NOT connect to 5V; BME690 operates on 3.3V)
  *    - GND -> GND
  *    - SDA -> GPIO 21 (ESP32 SDA)
  *    - SCL -> GPIO 22 (ESP32 SCL)
@@ -21,15 +21,9 @@
  *    - GND -> GND
  *    - OUT -> GPIO 14 (Configured as Digital Input)
  * 
- * 3. DHT11 Humidity Sensor (Digital):
- *    - VCC -> 3.3V or 5V
- *    - GND -> GND
- *    - DATA/OUT -> GPIO 4 (Configured as Digital Input)
- * 
  * Dependencies (Install in Arduino IDE via Library Manager):
- * - Adafruit BMP085 Library (for BMP180)
+ * - 7Semi BME690 Library (by 7Semi-solutions)
  * - Adafruit Unified Sensor
- * - DHT sensor library (by Adafruit)
  * - ArduinoJson (by Benoit Blanchon - supports v6 and v7)
  * - WebServer (built-in with ESP32 Arduino Core)
  */
@@ -38,9 +32,8 @@
 #include <WebServer.h>
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <Adafruit_BMP085.h>
+#include <7semi_BME690.h>
 #include <ArduinoJson.h>
-#include <DHT.h>
 
 // Forward Function Declarations
 void setupAccessPoint();
@@ -59,13 +52,10 @@ const int ap_max_connections = 4;             // Max simultaneous clients
 #define PIR_PIN 14
 #define I2C_SDA 21
 #define I2C_SCL 22
-#define DHT_PIN 4      // DHT11 data pin connected to GPIO 4
-#define DHT_TYPE DHT11
 
 // --- Sensor Objects ---
-Adafruit_BMP085 bmp;
-bool bmpAvailable = false;
-DHT dht(DHT_PIN, DHT_TYPE);
+BME690_7semi bme;
+bool bmeAvailable = false;
 
 // --- Web Server on port 80 ---
 WebServer server(80);
@@ -84,21 +74,17 @@ void setup() {
 
   // Init PIR Sensor
   pinMode(PIR_PIN, INPUT);
-  Serial.println("[PIR] Motion Sensor initialized on GPIO 15");
+  Serial.println("[PIR] Motion Sensor initialized on GPIO 14");
 
-  // Init BMP180 Sensor via I2C
+  // Init BME690 Sensor via I2C
   Wire.begin(I2C_SDA, I2C_SCL);
-  if (!bmp.begin()) {
-    Serial.println("[BMP180] WARNING: Could not find BMP180 sensor! Will use default environmental baselines. Check SDA=21, SCL=22, VCC=3.3V");
-    bmpAvailable = false;
+  if (!bme.begin()) {
+    Serial.println("[BME690] WARNING: Could not find BME690 sensor! Will use default environmental baselines. Check SDA=21, SCL=22, VCC=3.3V");
+    bmeAvailable = false;
   } else {
-    Serial.println("[BMP180] Sensor initialized successfully on SDA=21, SCL=22");
-    bmpAvailable = true;
+    Serial.println("[BME690] Sensor initialized successfully on SDA=21, SCL=22");
+    bmeAvailable = true;
   }
-
-  // Init DHT11 Sensor
-  dht.begin();
-  Serial.println("[DHT11] Sensor initialized successfully on GPIO 4");
 
   // Start WiFi Access Point
   setupAccessPoint();
@@ -163,24 +149,26 @@ void updateTelemetry() {
   // 1. Read Digital PIR Motion Sensor
   int pirState = digitalRead(PIR_PIN);
 
-  // 2. Read Environmental Data (BMP180 + DHT11)
-  float humidityPct = dht.readHumidity();
-  if (isnan(humidityPct)) humidityPct = 45.0; // Fallback baseline if DHT11 fails to read
-
+  // 2. Read Environmental Data from BME690
   float temperatureC = 25.0;
+  float humidityPct = 45.0;
   float pressureHpa = 1013.25;
+  float gasResistanceKOhms = 0.0;
 
-  if (bmpAvailable) {
-    temperatureC = bmp.readTemperature();
-    pressureHpa = bmp.readPressure() / 100.0F; // Convert Pa to hPa / mbar
-  } else {
-    // Fallback to DHT11 for temperature if BMP180 is not available
-    float dhtTemp = dht.readTemperature();
-    if (!isnan(dhtTemp)) temperatureC = dhtTemp;
+  if (bmeAvailable) {
+    temperatureC = bme.getTemperature();
+    humidityPct = bme.getHumidity();
+    
+    // Safety check: Convert Pascals (Pa) to hectopascals (hPa) if raw pressure is returned
+    float rawPressure = bme.getPressure();
+    if (rawPressure > 2000.0) {
+      pressureHpa = rawPressure / 100.0F;
+    } else {
+      pressureHpa = rawPressure;
+    }
+    
+    gasResistanceKOhms = bme.getGasResistance() / 1000.0F; // Convert Ohms to kOhms
   }
-  
-  if (isnan(temperatureC)) temperatureC = 25.0;
-  if (isnan(pressureHpa)) pressureHpa = 1013.25;
 
   // 3. Map Sensors to TERRA-SENSE ML Feature Inputs
   float breathing_hz = 0.0;
@@ -230,6 +218,7 @@ void updateTelemetry() {
   jsonDoc["environment_raw"]["temperature_c"] = temperatureC;
   jsonDoc["environment_raw"]["humidity_pct"] = humidityPct;
   jsonDoc["environment_raw"]["pressure_hpa"] = pressureHpa;
+  jsonDoc["environment_raw"]["gas_resistance_kiohms"] = gasResistanceKOhms;
 
   // Mapped ML Model Inputs
   jsonDoc["ml_inputs"]["breathing_hz"] = breathing_hz;
@@ -247,9 +236,6 @@ void updateTelemetry() {
   jsonDoc["active"] = true;
   jsonDoc["uptime_ms"] = millis();
 
-
-
-  
   // 5. Serialize and cache the JSON payload
   cachedTelemetryJson = "";
   serializeJson(jsonDoc, cachedTelemetryJson);
@@ -273,31 +259,67 @@ void handleTelemetryAPI() {
 }
 
 void handleRoot() {
-  // Serve a simple status page
+  // Serve a clean, white-themed console and status dashboard
   String html = "<!DOCTYPE html><html><head>";
   html += "<meta charset='UTF-8'>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1.0'>";
-  html += "<title>TERRA-SENSE ESP32</title>";
+  html += "<title>TERRA-SENSE ESP32 Console</title>";
   html += "<style>";
-  html += "body{font-family:monospace;background:#0a0a0a;color:#00ff88;padding:20px;margin:0}";
-  html += "h1{color:#00ff88;border-bottom:2px solid #00ff88;padding-bottom:10px}";
-  html += ".info{background:#111;border:1px solid #00ff88;border-radius:8px;padding:15px;margin:10px 0}";
-  html += "a{color:#00aaff;text-decoration:none}";
-  html += "a:hover{text-decoration:underline}";
-  html += "#data{white-space:pre-wrap;word-wrap:break-word;font-size:12px;line-height:1.6}";
-  html += ".status{display:inline-block;width:10px;height:10px;background:#00ff88;border-radius:50%;margin-right:8px;animation:pulse 1.5s infinite}";
+  html += "body{font-family:monospace;background:#050505;color:#ffffff;padding:20px;margin:0}";
+  html += "h1{color:#ffffff;border-bottom:1px solid #333333;padding-bottom:10px;font-size:22px}";
+  html += ".info{background:#111111;border:1px solid #333333;border-radius:6px;padding:12px;margin:10px 0;line-height:1.6;font-size:13px}";
+  html += ".status-dot{display:inline-block;width:8px;height:8px;background:#00ff88;border-radius:50%;margin-right:6px;animation:pulse 1.5s infinite}";
   html += "@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}";
+  html += ".sensor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:15px 0}";
+  html += ".sensor-card{background:#111111;border:1px solid #222222;padding:12px 15px;border-radius:6px}";
+  html += ".sensor-lbl{color:#888888;font-size:10px;text-transform:uppercase;letter-spacing:0.5px}";
+  html += ".sensor-val{font-size:18px;font-weight:bold;margin-top:4px}";
+  html += ".console-container{background:#000000;border:1px solid #333333;border-radius:6px;padding:12px;margin-top:20px}";
+  html += ".console-hdr{color:#888888;border-bottom:1px solid #222222;padding-bottom:6px;margin-bottom:8px;font-size:11px;display:flex;justify-content:space-between}";
+  html += "#console{height:180px;overflow-y:auto;white-space:pre-wrap;word-wrap:break-word;font-size:11px;line-height:1.4;color:#ffffff}";
   html += "</style></head><body>";
   html += "<h1>&#x1F4E1; TERRA-SENSE ESP32 Node</h1>";
-  html += "<div class='info'><span class='status'></span><strong>Status:</strong> ONLINE | ";
-  html += "<strong>Uptime:</strong> " + String(millis() / 1000) + "s | ";
-  html += "<strong>Connected Clients:</strong> " + String(WiFi.softAPgetStationNum()) + "</div>";
-  html += "<div class='info'><strong>API Endpoint:</strong> <a href='/api/telemetry'>/api/telemetry</a> (JSON)</div>";
-  html += "<div class='info'><strong>Live Telemetry Data:</strong><br><pre id='data'>Loading...</pre></div>";
+  html += "<div class='info'><span class='status-dot'></span><strong>Status:</strong> ONLINE | ";
+  html += "<strong>Uptime:</strong> <span id='uptime'>--</span>s | ";
+  html += "<strong>Clients:</strong> <span id='clients'>--</span></div>";
+  
+  html += "<div class='sensor-grid'>";
+  html += "<div class='sensor-card'><div class='sensor-lbl'>Temperature</div><div class='sensor-val' id='temp'>-- &deg;C</div></div>";
+  html += "<div class='sensor-card'><div class='sensor-lbl'>Humidity</div><div class='sensor-val' id='humid'>-- %</div></div>";
+  html += "<div class='sensor-card'><div class='sensor-lbl'>Pressure</div><div class='sensor-val' id='pres'>-- hPa</div></div>";
+  html += "<div class='sensor-card'><div class='sensor-lbl'>Gas Resistance</div><div class='sensor-val' id='gas'>-- k&Omega;</div></div>";
+  html += "<div class='sensor-card'><div class='sensor-lbl'>Motion (PIR)</div><div class='sensor-val' id='motion'>--</div></div>";
+  html += "</div>";
+
+  html += "<div class='console-container'>";
+  html += "<div class='console-hdr'><span>ESP32 SERIAL MONITOR OUTPUT</span><span>115200 baud</span></div>";
+  html += "<div id='console'>Connecting log stream...</div>";
+  html += "</div>";
+
   html += "<script>";
-  html += "function f(){fetch('/api/telemetry').then(r=>r.json()).then(d=>{";
-  html += "document.getElementById('data').textContent=JSON.stringify(d,null,2)";
-  html += "}).catch(e=>{document.getElementById('data').textContent='Error: '+e})}";
+  html += "const c=document.getElementById('console');";
+  html += "function log(msg){";
+  html += "  const t=new Date().toLocaleTimeString();";
+  html += "  if(c.textContent==='Connecting log stream...') c.textContent='';";
+  html += "  c.textContent+=`[${t}] ${msg}\\n`;";
+  html += "  c.scrollTop=c.scrollHeight;";
+  html += "}";
+  html += "function f(){";
+  html += "  fetch('/api/telemetry').then(r=>r.json()).then(d=>{";
+  html += "    document.getElementById('uptime').textContent=Math.round(d.uptime_ms/1000);";
+  html += "    document.getElementById('clients').textContent=d.ap_clients;";
+  html += "    if(d.environment_raw){";
+  html += "      document.getElementById('temp').textContent=d.environment_raw.temperature_c.toFixed(1)+' &deg;C';";
+  html += "      document.getElementById('humid').textContent=d.environment_raw.humidity_pct.toFixed(1)+' %';";
+  html += "      document.getElementById('pres').textContent=d.environment_raw.pressure_hpa.toFixed(1)+' hPa';";
+  html += "      const g=d.environment_raw.gas_resistance_kiohms;";
+  html += "      document.getElementById('gas').textContent=g?g.toFixed(1)+' k&Omega;':'N/A';";
+  html += "    }";
+  html += "    document.getElementById('motion').textContent=d.pir_motion?'WARNING':'CLEAR';";
+  html += "    document.getElementById('motion').style.color=d.pir_motion?'#ff4444':'#ffffff';";
+  html += "    log('Serial Payload: '+JSON.stringify(d));";
+  html += "  }).catch(e=>{log('Error: '+e)});";
+  html += "}";
   html += "f();setInterval(f,1000);";
   html += "</script></body></html>";
   
