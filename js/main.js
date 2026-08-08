@@ -138,9 +138,9 @@ class TerraSenseApp {
 
     if (path === '/api/predict') {
       if (isESP32Hotspot || cleanHost.startsWith('192.168.')) {
-        const localHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        const localHost = (window.location.hostname && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
           ? window.location.host
-          : `${window.location.hostname}:3000`;
+          : 'localhost:3000';
         return `http://${localHost}/api/predict`;
       }
       if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
