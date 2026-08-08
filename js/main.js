@@ -115,35 +115,43 @@ class TerraSenseApp {
       hostIp = localStorage.getItem('terra_sense_host_ip') || '';
     }
     
-    const isESP32Hotspot = (hostIp === '192.168.4.1');
+    // Clean hostIp to extract raw host/IP
+    let cleanHost = hostIp.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
+
+    // If running from local file:// scheme, fallback to localhost:3000 to reach backend
+    if (!cleanHost && (window.location.protocol === 'file:' || !window.location.hostname)) {
+      cleanHost = 'localhost:3000';
+    }
+
+    const isESP32Hotspot = (cleanHost === '192.168.4.1');
 
     if (path === '/api/telemetry') {
-      if (isESP32Hotspot) {
-        return 'http://192.168.4.1/api/telemetry';
+      if (isESP32Hotspot || cleanHost.startsWith('192.168.')) {
+        return `http://${cleanHost}/api/telemetry`;
       }
-      if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1' && hostIp !== window.location.hostname) {
-        const targetHost = hostIp.includes(':') ? hostIp : `${hostIp}:3000`;
+      if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
+        const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
         return `http://${targetHost}${path}`;
       }
       return path;
     }
 
     if (path === '/api/predict') {
-      if (isESP32Hotspot) {
+      if (isESP32Hotspot || cleanHost.startsWith('192.168.')) {
         const localHost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
           ? window.location.host
           : `${window.location.hostname}:3000`;
         return `http://${localHost}/api/predict`;
       }
-      if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1' && hostIp !== window.location.hostname) {
-        const targetHost = hostIp.includes(':') ? hostIp : `${hostIp}:3000`;
+      if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
+        const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
         return `http://${targetHost}${path}`;
       }
       return path;
     }
 
-    if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1' && hostIp !== window.location.hostname) {
-      const targetHost = hostIp.includes(':') ? hostIp : `${hostIp}:3000`;
+    if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
+      const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
       return `http://${targetHost}${path}`;
     }
     return path;
@@ -246,13 +254,34 @@ class TerraSenseApp {
     const placeholder = document.getElementById('espCamPlaceholder');
     const statusText = document.getElementById('espCamStatusText');
     const dot = document.getElementById('espCamDot');
-    const btnPinouts = document.getElementById('btnCamModelInfo');
-    const modal = document.getElementById('camModelModal');
-    const btnCloseModal = document.getElementById('btnCloseCamModelModal');
-    const btnCloseModal2 = document.getElementById('btnCloseCamModelModal2');
 
     let flashOn = false;
     let isDemoMode = false;
+
+    const setStatus = (online, text) => {
+      if (dot) dot.style.background = online ? 'var(--accent-emerald)' : '#9ca3af';
+      if (statusText) statusText.textContent = text;
+    };
+
+    const formatCamUrl = (rawInput) => {
+      let str = (rawInput || '').trim();
+      if (!str) return '';
+      if (!str.startsWith('http://') && !str.startsWith('https://')) {
+        str = 'http://' + str;
+      }
+      try {
+        const urlObj = new URL(str);
+        if (urlObj.pathname === '/' || urlObj.pathname === '') {
+          urlObj.pathname = '/stream';
+        }
+        return urlObj.toString();
+      } catch (e) {
+        if (!str.includes('/stream')) {
+          str = str.replace(/\/$/, '') + '/stream';
+        }
+        return str;
+      }
+    };
 
     // Load saved Cam IP
     const savedCamUrl = localStorage.getItem('terra_sense_cam_url');
@@ -260,38 +289,42 @@ class TerraSenseApp {
       inputCamIp.value = savedCamUrl;
     }
 
-    const setStatus = (online, text) => {
-      if (dot) dot.style.background = online ? 'var(--accent-emerald)' : '#9ca3af';
-      if (statusText) statusText.textContent = text;
-    };
+    const connectStream = (rawUrl) => {
+      if (!rawUrl) return;
+      const formattedUrl = formatCamUrl(rawUrl);
+      localStorage.setItem('terra_sense_cam_url', formattedUrl);
+      if (inputCamIp) inputCamIp.value = formattedUrl;
 
-    const connectStream = (url) => {
-      if (!url) return;
-      localStorage.setItem('terra_sense_cam_url', url);
       setStatus(true, 'CONNECTING STREAM...');
       
-      if (imgStream) {
-        imgStream.src = url;
-        imgStream.style.display = 'block';
-        if (placeholder) placeholder.style.display = 'none';
-      }
-
       if (imgStream) {
         imgStream.onerror = () => {
           setStatus(false, 'STREAM OFFLINE / TIMEOUT');
           imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
         };
-        imgStream.onload = () => {
-          setStatus(true, 'LIVE OPTICAL FEED ONLINE');
-        };
+
+        imgStream.src = formattedUrl;
+        imgStream.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+        
+        setTimeout(() => {
+          if (imgStream.style.display !== 'none') {
+            setStatus(true, 'LIVE OPTICAL FEED ONLINE');
+          }
+        }, 500);
       }
     };
 
     if (btnConnect && inputCamIp) {
       btnConnect.addEventListener('click', () => {
         isDemoMode = false;
-        connectStream(inputCamIp.value.trim());
+        const val = inputCamIp.value.trim();
+        if (!val) {
+          connectStream('192.168.4.2/stream');
+        } else {
+          connectStream(val);
+        }
       });
     }
 
@@ -302,10 +335,15 @@ class TerraSenseApp {
         btnFlash.classList.toggle('active', flashOn);
         const camIp = inputCamIp ? inputCamIp.value.trim() : '';
         if (camIp) {
-          const baseUrl = camIp.replace(/\/stream.*$/, '');
-          const targetLedUrl = `${baseUrl}/led?state=${flashOn ? 'on' : 'off'}`;
-          fetch(`/api/camera/proxy?url=${encodeURIComponent(targetLedUrl)}`)
-            .catch(err => console.warn('Flash command error:', err));
+          const formatted = formatCamUrl(camIp);
+          try {
+            const urlObj = new URL(formatted);
+            const targetLedUrl = `${urlObj.origin}/led?state=${flashOn ? 'on' : 'off'}`;
+            fetch(`/api/camera/proxy?url=${encodeURIComponent(targetLedUrl)}`)
+              .catch(err => console.warn('Flash command error:', err));
+          } catch (e) {
+            console.warn('Invalid URL for flash:', camIp);
+          }
         }
       });
     }
@@ -316,20 +354,25 @@ class TerraSenseApp {
         const camIp = inputCamIp ? inputCamIp.value.trim() : '';
         this.playBeep(880, 0.15);
         if (camIp) {
-          const baseUrl = camIp.replace(/\/stream.*$/, '');
-          const captureUrl = `${baseUrl}/capture`;
-          fetch(`/api/camera/proxy?url=${encodeURIComponent(captureUrl)}`)
-            .then(res => res.blob())
-            .then(blob => {
-              const objUrl = URL.createObjectURL(blob);
-              if (imgStream) {
-                imgStream.src = objUrl;
-                imgStream.style.display = 'block';
-                if (placeholder) placeholder.style.display = 'none';
-              }
-              setStatus(true, 'SNAPSHOT CAPTURED');
-            })
-            .catch(() => setStatus(false, 'SNAPSHOT FAILED'));
+          const formatted = formatCamUrl(camIp);
+          try {
+            const urlObj = new URL(formatted);
+            const captureUrl = `${urlObj.origin}/capture`;
+            fetch(`/api/camera/proxy?url=${encodeURIComponent(captureUrl)}`)
+              .then(res => res.blob())
+              .then(blob => {
+                const objUrl = URL.createObjectURL(blob);
+                if (imgStream) {
+                  imgStream.src = objUrl;
+                  imgStream.style.display = 'block';
+                  if (placeholder) placeholder.style.display = 'none';
+                }
+                setStatus(true, 'SNAPSHOT CAPTURED');
+              })
+              .catch(() => setStatus(false, 'SNAPSHOT FAILED'));
+          } catch (e) {
+            setStatus(false, 'INVALID CAMERA URL');
+          }
         } else {
           alert("Please enter a valid ESP32-CAM URL first.");
         }
@@ -1451,6 +1494,28 @@ class TerraSenseApp {
     this.playBeep(520, 0.1);
   }
 
+  animateCameraTo(targetPos, targetLookAt, duration = 600) {
+    if (!this.threeCamera || !this.threeControls) return;
+    const startPos = this.threeCamera.position.clone();
+    const startTarget = this.threeControls.target.clone();
+    const startTime = performance.now();
+
+    const step = (now) => {
+      const elapsed = now - startTime;
+      const t = Math.min(1, elapsed / duration);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+
+      this.threeCamera.position.lerpVectors(startPos, new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z), ease);
+      this.threeControls.target.lerpVectors(startTarget, new THREE.Vector3(targetLookAt.x, targetLookAt.y, targetLookAt.z), ease);
+      this.threeControls.update();
+
+      if (t < 1) {
+        requestAnimationFrame(step);
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  Event Bindings
   // ═══════════════════════════════════════════════════════════════
@@ -1565,21 +1630,56 @@ class TerraSenseApp {
       }
     });
 
-    // Sector quick focus buttons
-    const sectorNavs = [
-      { id: 'btnFocusSectorAll', pos: { x: 0, y: 13, z: 15 }, target: { x: 0, y: 0, z: 0 } },
-      { id: 'btnFocusSectorA',   pos: { x: -4, y: 8, z: -1 }, target: { x: -2.5, y: 0, z: -2.5 } },
-      { id: 'btnFocusSectorB',   pos: { x: 4, y: 8, z: -1 },  target: { x: 2.5, y: 0, z: -2.5 } },
-      { id: 'btnFocusSectorC',   pos: { x: -4, y: 8, z: 4 },  target: { x: -2.5, y: 0, z: 2.5 } },
-      { id: 'btnFocusSectorD',   pos: { x: 4, y: 8, z: 4 },   target: { x: 2.5, y: 0, z: 2.5 } }
-    ];
+    // Sector quick focus buttons & animations
+    const sectorNavMap = {
+      'btnFocusSectorAll': { sector: 'ALL', pos: { x: 0, y: 13, z: 15 }, target: { x: 0, y: 0, z: 0 } },
+      'btnFocusSectorA':   { sector: 'A',   pos: { x: -4.5, y: 7.5, z: -1 }, target: { x: -2.5, y: 0, z: -2.5 } },
+      'btnFocusSectorB':   { sector: 'B',   pos: { x: 4.5, y: 7.5, z: -1 },  target: { x: 2.5, y: 0, z: -2.5 } },
+      'btnFocusSectorC':   { sector: 'C',   pos: { x: -4.5, y: 7.5, z: 4.5 }, target: { x: -2.5, y: 0, z: 2.5 } },
+      'btnFocusSectorD':   { sector: 'D',   pos: { x: 4.5, y: 7.5, z: 4.5 },  target: { x: 2.5, y: 0, z: 2.5 } }
+    };
 
-    sectorNavs.forEach(nav => {
-      document.getElementById(nav.id)?.addEventListener('click', () => {
-        document.querySelectorAll('.btn-sector-nav').forEach(b => b.classList.remove('active'));
-        document.getElementById(nav.id)?.classList.add('active');
-        this.resetCamera(nav.pos, nav.target);
+    this.focusSector = (secId) => {
+      document.querySelectorAll('.btn-sector-nav').forEach(b => b.classList.remove('active'));
+      const btn = document.getElementById(secId);
+      if (btn) btn.classList.add('active');
+
+      const config = sectorNavMap[secId] || sectorNavMap['btnFocusSectorAll'];
+      
+      // Animate 3D Camera smoothly
+      this.animateCameraTo(config.pos, config.target);
+
+      // Highlight selected sector panel in 3D scene
+      SECTORS.forEach(s => {
+        const panel = this.sectorPanels[s.id];
+        if (panel) {
+          if (config.sector === 'ALL' || config.sector === s.id) {
+            panel.material.opacity = (config.sector === s.id) ? 0.35 : 0.08;
+          } else {
+            panel.material.opacity = 0.02;
+          }
+        }
       });
+      this.playBeep(520, 0.1);
+    };
+
+    Object.keys(sectorNavMap).forEach(btnId => {
+      document.getElementById(btnId)?.addEventListener('click', () => {
+        this.focusSector(btnId);
+      });
+    });
+
+    // Make Sector Status Grid Cards clickable to select sectors
+    const sectorCards = document.querySelectorAll('#sectorStatusPanel > div');
+    const secBtnList = ['btnFocusSectorA', 'btnFocusSectorB', 'btnFocusSectorC', 'btnFocusSectorD'];
+    sectorCards.forEach((card, idx) => {
+      if (secBtnList[idx]) {
+        card.style.cursor = 'pointer';
+        card.title = `Click to zoom into Sector ${SECTORS[idx].id}`;
+        card.addEventListener('click', () => {
+          this.focusSector(secBtnList[idx]);
+        });
+      }
     });
 
     // Chart tabs
@@ -1609,22 +1709,25 @@ class TerraSenseApp {
     const fileInput = document.getElementById('fileInputSim');
 
     if (dz && fileInput) {
-      dz.addEventListener('click', () => fileInput.click());
-      
-      dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor='#00f2fe'; dz.style.background='rgba(0, 242, 254, 0.08)'; });
-      dz.addEventListener('dragleave', () => { dz.style.borderColor='var(--border-color)'; dz.style.background='rgba(0,0,0,0.15)'; });
-      dz.addEventListener('drop', e => {
-        e.preventDefault();
-        dz.style.borderColor='var(--border-color)';
-        dz.style.background='rgba(0,0,0,0.15)';
-        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          this.handleFileUpload(e.dataTransfer.files[0]);
-        }
+      // Native drag styling events on top-layer input
+      fileInput.addEventListener('dragover', (e) => { 
+        e.preventDefault(); 
+        dz.style.borderColor = '#00f2fe'; 
+        dz.style.background = 'rgba(0, 242, 254, 0.08)'; 
+      });
+      fileInput.addEventListener('dragleave', () => { 
+        dz.style.borderColor = 'var(--border-color)'; 
+        dz.style.background = 'rgba(0,0,0,0.15)'; 
+      });
+      fileInput.addEventListener('drop', () => {
+        dz.style.borderColor = 'var(--border-color)';
+        dz.style.background = 'rgba(0,0,0,0.15)';
       });
 
       fileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files.length > 0) {
           this.handleFileUpload(e.target.files[0]);
+          e.target.value = '';
         }
       });
     }
@@ -1658,10 +1761,14 @@ class TerraSenseApp {
       const text = e.target.result;
       this.parseAndApplyFileData(fileName, text);
     };
+    reader.onerror = (err) => {
+      console.warn('FileReader error:', err);
+      this.parseAndApplyFileData(fileName, null);
+    };
 
-    if (fileName.endsWith('.json') || fileName.endsWith('.csv') || fileName.endsWith('.txt') || fileName.endsWith('.gpr')) {
+    try {
       reader.readAsText(file);
-    } else {
+    } catch (e) {
       this.parseAndApplyFileData(fileName, null);
     }
   }
@@ -1688,35 +1795,80 @@ class TerraSenseApp {
           if (json.dielectric_shift) this.params.dielectric = parseFloat(json.dielectric_shift);
           if (json.soil_moisture) this.params.moisture = parseFloat(json.soil_moisture);
           if (json.soil_density) this.params.density = parseFloat(json.soil_density);
+          rowCount = 1;
         } else {
-          // CSV / Text parsing
-          const lines = content.trim().split('\n').filter(l => l.trim().length > 0);
+          // Quote-aware CSV parser
+          const parseCsvLine = (line) => {
+            const result = [];
+            let insideQuote = false;
+            let entry = '';
+            for (let char of line) {
+              if (char === '"' || char === "'") {
+                insideQuote = !insideQuote;
+              } else if (char === ',' && !insideQuote) {
+                result.push(entry.trim());
+                entry = '';
+              } else {
+                entry += char;
+              }
+            }
+            result.push(entry.trim());
+            return result;
+          };
+
+          const lines = content.trim().split(/\r?\n/).filter(l => l.trim().length > 0);
           if (lines.length > 1) {
-            const header = lines[0].toLowerCase().split(',').map(h => h.trim());
+            const header = parseCsvLine(lines[0].toLowerCase());
             rowCount = lines.length - 1;
 
             const depthIdx = header.findIndex(h => h.includes('depth') || h.includes('meters'));
-            const respIdx = header.findIndex(h => h.includes('respiration') || h.includes('breath') || h.includes('doppler'));
-            const humanIdx = header.findIndex(h => h.includes('human') || h.includes('is_human') || h.includes('victim'));
-            const xIdx = header.findIndex(h => h.includes('grid_x') || h.includes('x_m') || h.includes('coordinate_x') || h.trim() === 'x');
-            const yIdx = header.findIndex(h => h.includes('grid_y') || h.includes('y_m') || h.includes('coordinate_y') || h.trim() === 'y');
+            const respIdx = header.findIndex(h => h.includes('respiration') || h.includes('breath') || h.includes('doppler') || h.includes('vital'));
+            const heartIdx = header.findIndex(h => h.includes('heart') || h.includes('pulse') || h.includes('cardiac'));
+            const humanIdx = header.findIndex(h => h.includes('human') || h.includes('is_human') || h.includes('victim') || h.includes('category') || h.includes('anomaly'));
+            const xIdx = header.findIndex(h => h.includes('grid_x') || h.includes('x_m') || h.includes('coordinate_x') || h === 'x');
+            const yIdx = header.findIndex(h => h.includes('grid_y') || h.includes('y_m') || h.includes('coordinate_y') || h === 'y');
             const thermalIdx = header.findIndex(h => h.includes('thermal') || h.includes('temp') || h.includes('temperature'));
             const moistureIdx = header.findIndex(h => h.includes('moisture') || h.includes('humidity'));
-            const dielectricIdx = header.findIndex(h => h.includes('dielectric'));
+            const dielectricIdx = header.findIndex(h => h.includes('dielectric') || h.includes('permittivity') || h.includes('constant'));
+
+            const isCmDepth = header.some(h => h.includes('depth_cm') || h.includes('_cm'));
+            const isHzResp = respIdx !== -1 && (header[respIdx].includes('_hz') || header[respIdx].includes('hertz'));
 
             this.parsedTargets = [];
 
             for (let i = 1; i < lines.length; i++) {
-              const row = lines[i].split(',').map(v => v.trim());
+              const row = parseCsvLine(lines[i]);
               if (row.length < header.length) continue;
 
-              const depth = depthIdx !== -1 ? parseFloat(row[depthIdx]) || 1.5 : 1.5;
-              const respBpm = respIdx !== -1 ? parseFloat(row[respIdx]) || 0.0 : 0.0;
-              const isHumanFlag = humanIdx !== -1 ? (row[humanIdx].toLowerCase() === 'true' || row[humanIdx] === '1' || row[humanIdx].toLowerCase() === 'yes') : (respBpm > 0);
-              
-              const breathing_hz = respBpm > 0 ? (respBpm / 60.0) : (isHumanFlag ? 0.22 : 0.0);
-              const heartbeat_hz = respBpm > 0 ? ((respBpm * 4.2) / 60.0) : (isHumanFlag ? 1.10 : 0.0);
-              
+              let depth = depthIdx !== -1 ? parseFloat(row[depthIdx]) || 1.5 : 1.5;
+              if (isCmDepth || depth > 25.0) {
+                depth = depth / 100.0;
+              }
+
+              const rawResp = respIdx !== -1 ? parseFloat(row[respIdx]) || 0.0 : 0.0;
+              const rawHeart = heartIdx !== -1 ? parseFloat(row[heartIdx]) || 0.0 : 0.0;
+
+              const humanVal = humanIdx !== -1 ? row[humanIdx].toLowerCase() : '';
+              const isHumanFlag = (humanVal === 'true' || humanVal === '1' || humanVal === 'yes' || humanVal.includes('human') || humanVal.includes('victim') || humanVal.includes('live') || rawResp > 0.05);
+
+              let breathing_hz = 0.0;
+              if (isHzResp) {
+                breathing_hz = rawResp;
+              } else if (rawResp > 0) {
+                breathing_hz = rawResp / 60.0;
+              } else if (isHumanFlag) {
+                breathing_hz = 0.28;
+              }
+
+              let heartbeat_hz = 0.0;
+              if (rawHeart > 0) {
+                heartbeat_hz = rawHeart > 10 ? (rawHeart / 60.0) : rawHeart;
+              } else if (breathing_hz > 0) {
+                heartbeat_hz = breathing_hz * 4.2;
+              } else if (isHumanFlag) {
+                heartbeat_hz = 1.15;
+              }
+
               const x = xIdx !== -1 ? parseFloat(row[xIdx]) || 0.0 : (Math.random() * 8.0 - 4.0);
               const y = yIdx !== -1 ? parseFloat(row[yIdx]) || 0.0 : (Math.random() * 8.0 - 4.0);
               
@@ -1725,16 +1877,25 @@ class TerraSenseApp {
               const bme_humidity_pct = moistureIdx !== -1 ? parseFloat(row[moistureIdx]) || 35.0 : 35.0;
               const dielectric_shift = dielectricIdx !== -1 ? parseFloat(row[dielectricIdx]) || (isHumanFlag ? 6.5 : 1.0) : (isHumanFlag ? 6.5 : 1.0);
 
+              const pir_motion = (isHumanFlag || breathing_hz > 0.05) ? 1 : 0;
+              const radar_state = (isHumanFlag || breathing_hz > 0.05) ? 2 : 0;
+              const radar_energy = (isHumanFlag || breathing_hz > 0.05) ? 82.5 : 0.0;
+              const micro_amp = (isHumanFlag || breathing_hz > 0.05) ? 0.75 : 0.02;
+              const snr_db = (isHumanFlag || breathing_hz > 0.05) ? 18.5 : -10.0;
+
               this.parsedTargets.push({
                 human_under_soil: isHumanFlag,
-                breathing_hz,
-                heartbeat_hz,
-                micro_amp: isHumanFlag ? 0.75 : 0.02,
-                snr_db: isHumanFlag ? 18.0 : -10.0,
+                breathing_hz: parseFloat(breathing_hz.toFixed(3)),
+                heartbeat_hz: parseFloat(heartbeat_hz.toFixed(3)),
+                pir_motion,
+                radar_state,
+                radar_energy,
+                micro_amp,
+                snr_db,
                 bme_temp_c,
                 bme_humidity_pct,
                 dielectric_shift,
-                reflection_depth: depth,
+                reflection_depth: parseFloat(depth.toFixed(2)),
                 x,
                 y,
                 grid_x: x,
@@ -1742,7 +1903,6 @@ class TerraSenseApp {
               });
             }
 
-            // Sync peak parameters from first row for slider visualization fallback
             if (this.parsedTargets.length > 0) {
               const first = this.parsedTargets[0];
               this.params.depth = first.reflection_depth;
@@ -2164,9 +2324,7 @@ class TerraSenseApp {
     const moisture   = targetData ? targetData.bme_humidity_pct : (this.params.moisture || 35.0);
     const x         = targetData ? (targetData.x !== undefined ? targetData.x : 0) : 14.2;
     const y         = targetData ? (targetData.y !== undefined ? targetData.y : 0) : 9.6;
-    const isHumanOverride = targetData ? targetData.human_under_soil : null;
-
-    const isHuman = isHumanOverride !== null ? isHumanOverride : (breathing >= 0.08 && heartbeat >= 0.40 && microamp >= 0.15);
+    const isHuman = isHumanOverride !== null ? isHumanOverride : (breathing >= 0.05 || heartbeat >= 0.30 || microamp >= 0.10 || (breathing > 0 && heartbeat > 0));
     let prob = 0;
     if (isHuman) {
       const bWeight = Math.min(1, (breathing - 0.08) / 0.35);
@@ -2330,23 +2488,41 @@ class TerraSenseApp {
   async loadSampleCsv() {
     this.playBeep(440, 0.1);
     try {
-      const res = await fetch('sample_gpr_scan.csv');
+      let res = await fetch('sample_gpr_scan.csv');
+      let filename = 'sample_gpr_scan.csv';
+      if (!res.ok) {
+        res = await fetch('test file/human_under_soil_detection_data.csv');
+        filename = 'human_under_soil_detection_data.csv';
+      }
       if (res.ok) {
         const text = await res.text();
-        this.parseAndApplyFileData('sample_gpr_scan.csv', text);
+        this.parseAndApplyFileData(filename, text);
         return;
       }
     } catch (e) {
-      console.warn('Failed fetching sample_gpr_scan.csv:', e);
+      console.warn('Failed fetching sample CSV via network, using offline fallback:', e);
     }
-    // Fallback parameters
-    this.params.breathing = 0.28;
-    this.params.heartbeat = 1.15;
-    this.params.depth = 1.85;
-    this.params.moisture = 42.5;
-    this.params.snr = 18.2;
-    this.params.dielectric = 9.2;
-    this.parseAndApplyFileData('sample_gpr_scan.csv', null);
+    
+    // Inlined robust fallback dataset to ensure "Run Test Demo Scan" works 100% offline or on local file:// opens
+    const fallbackCsv = `depth_m,signal_amplitude_mv,doppler_freq_hz,dielectric_permittivity,moisture_pct,density_kg_m3
+0.0,98.2,0.0,6.5,28.0,1750
+0.4,45.4,0.0,6.5,28.0,1750
+0.8,12.1,0.01,6.5,28.0,1750
+1.2,82.5,0.32,7.8,28.0,1750
+1.6,18.4,0.02,6.5,28.0,1750
+2.0,10.2,0.0,6.5,28.0,1750
+2.4,14.6,0.01,6.5,28.0,1750
+2.8,68.0,0.24,5.4,28.0,1750
+3.2,9.5,0.01,6.5,28.0,1750
+3.6,6.2,0.0,6.5,28.0,1750
+4.0,5.1,0.0,6.5,28.0,1750
+4.4,4.2,0.0,6.5,28.0,1750
+4.8,3.5,0.0,6.5,28.0,1750
+5.2,2.8,0.0,6.5,28.0,1750
+5.6,2.1,0.0,6.5,28.0,1750
+6.0,1.5,0.0,6.5,28.0,1750`;
+
+    this.parseAndApplyFileData('sample_gpr_scan.csv', fallbackCsv);
   }
 
   exportReport() {

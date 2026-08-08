@@ -165,6 +165,10 @@ def camera_proxy():
     if not target_url:
         return jsonify({"status": "error", "message": "Missing target 'url' parameter"}), 400
 
+    target_url = target_url.strip()
+    if not target_url.startswith(('http://', 'https://')):
+        target_url = 'http://' + target_url
+
     try:
         if request.method == 'POST':
             data = request.get_json(silent=True) or {}

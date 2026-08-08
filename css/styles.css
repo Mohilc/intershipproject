@@ -1427,4 +1427,10 @@ footer.app-footer {
   100% { border-color: rgba(16, 185, 129, 0.25); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.1); }
 }
 
+@media (max-width: 768px) {
+  .hardware-nodes-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 
