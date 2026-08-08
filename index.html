@@ -330,9 +330,12 @@
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 0.3rem; display: block; opacity: 0.5;"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               <span id="espCamStatusText">CAMERA NODE OFFLINE</span>
             </div>
-            <div id="espCamOverlayBadge" style="position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); border: 1px solid var(--border-color); border-radius: 3px; padding: 2px 5px; font-family: var(--font-mono); font-size: 0.6rem; color: #fff; display: flex; align-items: center; gap: 4px;">
+            <div id="espCamOverlayBadge" style="position: absolute; top: 5px; left: 5px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); border: 1px solid var(--border-color); border-radius: 3px; padding: 2px 5px; font-family: var(--font-mono); font-size: 0.6rem; color: #fff; display: flex; align-items: center; gap: 4px; z-index: 15;">
               <span id="espCamDot" style="width: 5px; height: 5px; border-radius: 50%; background: #9ca3af; display: inline-block;"></span>
               <span id="espCamModelBadge">AI-THINKER</span>
+            </div>
+            <div id="espCamYoloAlert" style="display: none; position: absolute; top: 5px; right: 5px; background: rgba(244,63,94,0.9); backdrop-filter: blur(4px); border: 1px solid #f43f5e; border-radius: 3px; padding: 2.5px 6px; font-family: var(--font-mono); font-size: 0.6rem; color: #fff; z-index: 15; font-weight: 700; letter-spacing: 0.5px; animation: blinker 1.2s linear infinite;">
+              ⚠ HUMAN DETECTED
             </div>
           </div>
 
@@ -345,6 +348,7 @@
             <div style="display: flex; justify-content: space-between; gap: 0.35rem;">
               <button id="btnToggleFlash" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Toggle Onboard Flash LED">FLASH LIGHT</button>
               <button id="btnCaptureSnapshot" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Capture Frame for AI Analysis">SNAPSHOT</button>
+              <button id="btnToggleYolo" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem; color: var(--accent-emerald); border-color: rgba(16,185,129,0.3);" title="Toggle YOLOv8 Human Object Detection">YOLO AI: OFF</button>
               <button id="btnDemoCamStream" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Toggle Synthetic Demo Stream">DEMO FEED</button>
             </div>
           </div>

@@ -255,8 +255,16 @@ class TerraSenseApp {
     const statusText = document.getElementById('espCamStatusText');
     const dot = document.getElementById('espCamDot');
 
+    const btnYolo = document.getElementById('btnToggleYolo');
+    const yoloAlert = document.getElementById('espCamYoloAlert');
+    const btnPinouts = document.getElementById('btnCamModelInfo');
+    const modal = document.getElementById('camModelModal');
+    const btnCloseModal = document.getElementById('btnCloseCamModelModal');
+    const btnCloseModal2 = document.getElementById('btnCloseCamModelModal2');
+
     let flashOn = false;
     let isDemoMode = false;
+    let isYoloActive = false;
 
     const setStatus = (online, text) => {
       if (dot) dot.style.background = online ? 'var(--accent-emerald)' : '#9ca3af';
@@ -302,15 +310,27 @@ class TerraSenseApp {
           setStatus(false, 'STREAM OFFLINE / TIMEOUT');
           imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
+          if (yoloAlert) yoloAlert.style.display = 'none';
         };
 
-        imgStream.src = formattedUrl;
+        if (isYoloActive) {
+          imgStream.src = `/api/camera/stream_yolo?url=${encodeURIComponent(formattedUrl)}`;
+          if (yoloAlert) {
+            yoloAlert.style.display = 'block';
+            yoloAlert.textContent = '⚠ AI RUNNING';
+            yoloAlert.style.background = 'rgba(244,63,94,0.9)';
+          }
+        } else {
+          imgStream.src = formattedUrl;
+          if (yoloAlert) yoloAlert.style.display = 'none';
+        }
+
         imgStream.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
         
         setTimeout(() => {
           if (imgStream.style.display !== 'none') {
-            setStatus(true, 'LIVE OPTICAL FEED ONLINE');
+            setStatus(true, isYoloActive ? 'LIVE AI DETECT ONLINE' : 'LIVE OPTICAL FEED ONLINE');
           }
         }, 500);
       }
@@ -348,33 +368,86 @@ class TerraSenseApp {
       });
     }
 
-    // Snapshot Capture
+    // Snapshot Capture with YOLO inference
     if (btnSnapshot) {
       btnSnapshot.addEventListener('click', () => {
         const camIp = inputCamIp ? inputCamIp.value.trim() : '';
         this.playBeep(880, 0.15);
-        if (camIp) {
+        
+        setStatus(true, 'AI ANALYZING SNAPSHOT...');
+        const isDemoTarget = isDemoMode || !camIp;
+        
+        let targetApi = `/api/camera/analyze_snapshot?demo=true`;
+        if (!isDemoTarget) {
           const formatted = formatCamUrl(camIp);
           try {
-            const urlObj = new URL(formatted);
-            const captureUrl = `${urlObj.origin}/capture`;
-            fetch(`/api/camera/proxy?url=${encodeURIComponent(captureUrl)}`)
-              .then(res => res.blob())
-              .then(blob => {
-                const objUrl = URL.createObjectURL(blob);
-                if (imgStream) {
-                  imgStream.src = objUrl;
-                  imgStream.style.display = 'block';
-                  if (placeholder) placeholder.style.display = 'none';
-                }
-                setStatus(true, 'SNAPSHOT CAPTURED');
-              })
-              .catch(() => setStatus(false, 'SNAPSHOT FAILED'));
+            const captureUrl = `${new URL(formatted).origin}/capture`;
+            targetApi = `/api/camera/analyze_snapshot?url=${encodeURIComponent(captureUrl)}`;
           } catch (e) {
             setStatus(false, 'INVALID CAMERA URL');
+            return;
           }
+        }
+        
+        fetch(targetApi)
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === 'success') {
+              if (imgStream) {
+                imgStream.src = data.image;
+                imgStream.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+              }
+              if (yoloAlert) {
+                if (data.human_detected) {
+                  yoloAlert.style.display = 'block';
+                  yoloAlert.textContent = `⚠ HUMAN: ${data.confidence_pct}%`;
+                  yoloAlert.style.background = 'rgba(244,63,94,0.95)';
+                  this.playBeep(784, 0.3);
+                } else {
+                  yoloAlert.style.display = 'block';
+                  yoloAlert.textContent = '✓ CLEAR MATRIX';
+                  yoloAlert.style.background = 'rgba(16, 185, 129, 0.9)';
+                }
+              }
+              setStatus(true, data.human_detected ? `DETECTED: ${data.confidence_pct}% CONFIDENCE` : 'AI ANALYSIS: NO LIFE SIGNALS');
+            } else {
+              setStatus(false, 'AI ANALYSIS FAILED');
+            }
+          })
+          .catch((err) => {
+            console.warn(err);
+            setStatus(false, 'AI ANALYSIS OFFLINE');
+          });
+      });
+    }
+
+    // YOLO toggle listener
+    if (btnYolo) {
+      btnYolo.addEventListener('click', () => {
+        isYoloActive = !isYoloActive;
+        btnYolo.classList.toggle('active', isYoloActive);
+        btnYolo.textContent = `YOLO AI: ${isYoloActive ? 'ON' : 'OFF'}`;
+        if (isYoloActive) {
+          btnYolo.style.background = 'var(--accent-emerald)';
+          btnYolo.style.color = '#040711';
         } else {
-          alert("Please enter a valid ESP32-CAM URL first.");
+          btnYolo.style.background = '';
+          btnYolo.style.color = '';
+          if (yoloAlert) yoloAlert.style.display = 'none';
+        }
+        
+        if (imgStream && imgStream.style.display === 'block') {
+          if (isDemoMode) {
+            if (isYoloActive) {
+              if (yoloAlert) { yoloAlert.style.display = 'block'; yoloAlert.textContent = '⚠ HUMAN: 94.7%'; }
+            } else {
+              if (yoloAlert) yoloAlert.style.display = 'none';
+            }
+          } else {
+            const camIp = inputCamIp ? inputCamIp.value.trim() : '';
+            if (camIp) connectStream(camIp);
+          }
         }
       });
     }
@@ -386,8 +459,18 @@ class TerraSenseApp {
         btnDemo.classList.toggle('active', isDemoMode);
         if (isDemoMode) {
           if (imgStream) {
-            const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">DEMO OPTICAL FEED (640x480)</text></svg>`;
-            imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
+            if (isYoloActive) {
+              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">YOLO ACTIVE — DEMO FEED</text></svg>`;
+              imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
+              if (yoloAlert) {
+                yoloAlert.style.display = 'block';
+                yoloAlert.textContent = '⚠ HUMAN: 94.7%';
+              }
+            } else {
+              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">DEMO OPTICAL FEED (640x480)</text></svg>`;
+              imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
+              if (yoloAlert) yoloAlert.style.display = 'none';
+            }
             imgStream.style.display = 'block';
             if (placeholder) placeholder.style.display = 'none';
           }
@@ -395,6 +478,7 @@ class TerraSenseApp {
         } else {
           if (imgStream) imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
+          if (yoloAlert) yoloAlert.style.display = 'none';
           setStatus(false, 'CAMERA NODE OFFLINE');
         }
       });

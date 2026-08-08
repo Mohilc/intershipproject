@@ -5,7 +5,13 @@ Performance optimized: LRU prediction caching, gzip compression, static asset ca
 Includes: NVIDIA StreamPETR 3D human localizer for obstacle-proximity analysis.
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+import requests
+import cv2
+import numpy as np
+import base64
+import time
+import math
+from flask import Flask, request, jsonify, send_from_directory, Response
 from ml_model import SubsurfacePythonMLEngine
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
@@ -180,6 +186,231 @@ def camera_proxy():
         return (resp.content, resp.status_code, {'Content-Type': content_type, 'Access-Control-Allow-Origin': '*'})
     except Exception as e:
         return jsonify({"status": "error", "message": f"Camera node offline or unreachable: {str(e)}"}), 502
+
+# --- YOLOv8 / OpenCV Human Detection Integration ---
+_yolo_model = None
+
+def get_yolo_model():
+    global _yolo_model
+    if _yolo_model is None:
+        try:
+            from ultralytics import YOLO
+            # Load the pre-trained nano model (fastest inference, automatically cached locally)
+            _yolo_model = YOLO('yolov8n.pt')
+            print("[Server] YOLOv8 model loaded successfully.")
+        except Exception as e:
+            print(f"[Server] YOLOv8 load warning: {e}")
+    return _yolo_model
+
+def detect_humans(img):
+    """
+    Runs YOLOv8 human detection on a frame.
+    Returns: (processed_img, human_detected, highest_confidence, boxes)
+    """
+    model = get_yolo_model()
+    human_detected = False
+    highest_conf = 0.0
+    boxes_info = []
+
+    if model is None:
+        # Fallback to OpenCV HOG descriptor if YOLO is not available
+        try:
+            hog = cv2.HOGDescriptor()
+            hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+            h, w = img.shape[:2]
+            scale = 400.0 / w
+            resized = cv2.resize(img, (int(w * scale), int(h * scale)))
+            (rects, weights) = hog.detectMultiScale(resized, winStride=(4, 4), padding=(8, 8), scale=1.05)
+            
+            for (x, y, w_box, h_box), weight in zip(rects, weights):
+                x = int(x / scale)
+                y = int(y / scale)
+                w_box = int(w_box / scale)
+                h_box = int(h_box / scale)
+                conf = float(weight)
+                highest_conf = max(highest_conf, conf)
+                human_detected = True
+                boxes_info.append({"x": x, "y": y, "w": w_box, "h": h_box, "confidence": conf})
+                
+                # Draw bounding box
+                cv2.rectangle(img, (x, y), (x + w_box, y + h_box), (0, 242, 254), 2)
+                cv2.putText(img, f"Person: {conf:.2f}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 242, 254), 1)
+        except Exception as e:
+            print(f"[Server] OpenCV HOG detect failed: {e}")
+        return img, human_detected, highest_conf, boxes_info
+
+    try:
+        results = model(img, verbose=False)
+        for r in results:
+            boxes = r.boxes
+            for box in boxes:
+                cls_id = int(box.cls[0])
+                if cls_id == 0:  # Person class
+                    conf = float(box.conf[0])
+                    highest_conf = max(highest_conf, conf)
+                    human_detected = True
+                    
+                    xyxy = box.xyxy[0].tolist()
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    w_box = x2 - x1
+                    h_box = y2 - y1
+                    boxes_info.append({"x": x1, "y": y1, "w": w_box, "h": h_box, "confidence": conf})
+                    
+                    bgr_color = (12, 185, 16) if conf > 0.6 else (36, 191, 251)
+                    cv2.rectangle(img, (x1, y1), (x2, y2), bgr_color, 2)
+                    cv2.putText(img, f"HUMAN: {conf*100:.1f}%", (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bgr_color, 2)
+    except Exception as e:
+        print(f"[Server] YOLOv8 inference failed: {e}")
+        
+    return img, human_detected, highest_conf, boxes_info
+
+@app.route('/api/camera/stream_yolo')
+def stream_yolo():
+    """
+    Proxies ESP32-CAM MJPEG stream, runs YOLOv8 human detection on every frame,
+    and returns a live annotated MJPEG stream. Falls back to synthetic demo feed if camera is offline.
+    """
+    target_url = request.args.get('url')
+    
+    def generate_frames():
+        def generate_demo():
+            last_switch = time.time()
+            show_human = False
+            frame_idx = 0
+            while True:
+                time.sleep(0.06)
+                frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.circle(frame, (320, 240), 180, (40, 40, 0), 1)
+                cv2.circle(frame, (320, 240), 120, (30, 30, 0), 1)
+                cv2.line(frame, (320, 40), (320, 440), (40, 40, 0), 1)
+                cv2.line(frame, (120, 240), (520, 240), (40, 40, 0), 1)
+                
+                angle = (frame_idx * 0.05) % (2 * math.pi)
+                x_sweep = int(320 + 180 * math.cos(angle))
+                y_sweep = int(240 + 180 * math.sin(angle))
+                cv2.line(frame, (320, 240), (x_sweep, y_sweep), (254, 242, 0), 2)
+                
+                if time.time() - last_switch > 6.0:
+                    show_human = not show_human
+                    last_switch = time.time()
+                    
+                if show_human:
+                    cv2.rectangle(frame, (280, 180), (360, 340), (16, 185, 129), 2)
+                    cv2.putText(frame, "HUMAN: 94.7%", (280, 172), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (16, 185, 129), 2)
+                    dot_size = int(5 + 3 * math.sin(frame_idx * 0.2))
+                    cv2.circle(frame, (320, 260), dot_size, (16, 185, 129), -1)
+                    cv2.putText(frame, "Vitals Active", (330, 263), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (16, 185, 129), 1)
+                
+                cv2.putText(frame, "AI DETECTOR DEMO (NO LIVE CAM)", (170, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (254, 242, 0), 1)
+                
+                frame_idx += 1
+                _, buffer = cv2.imencode('.jpg', frame)
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        
+        if not target_url:
+            yield from generate_demo()
+            return
+
+        clean_url = target_url.strip()
+        if not clean_url.startswith(('http://', 'https://')):
+            clean_url = 'http://' + clean_url
+            
+        try:
+            stream = requests.get(clean_url, stream=True, timeout=5)
+            if stream.status_code != 200:
+                yield from generate_demo()
+                return
+                
+            byte_data = b''
+            for chunk in stream.iter_content(chunk_size=4096):
+                byte_data += chunk
+                a = byte_data.find(b'\xff\xd8')
+                b = byte_data.find(b'\xff\xd9')
+                if a != -1 and b != -1:
+                    jpg = byte_data[a:b+2]
+                    byte_data = byte_data[b+2:]
+                    
+                    np_arr = np.frombuffer(jpg, dtype=np.uint8)
+                    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                    
+                    if frame is not None:
+                        frame, detected, conf, boxes = detect_humans(frame)
+                        _, buffer = cv2.imencode('.jpg', frame)
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        except Exception as e:
+            print(f"[Server] Stream proxy error: {e}")
+            yield from generate_demo()
+
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/api/camera/analyze_snapshot', methods=['GET', 'POST', 'OPTIONS'])
+def analyze_snapshot():
+    """
+    Runs human detection on a snapshot frame from the ESP32-CAM.
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    target_url = request.args.get('url')
+    is_demo = request.args.get('demo', 'false').lower() == 'true' or not target_url
+    
+    try:
+        if is_demo:
+            frame = np.zeros((480, 640, 3), dtype=np.uint8)
+            cv2.circle(frame, (320, 240), 180, (40, 40, 0), 1)
+            cv2.circle(frame, (320, 240), 120, (30, 30, 0), 1)
+            cv2.line(frame, (320, 40), (320, 440), (40, 40, 0), 1)
+            cv2.line(frame, (120, 240), (520, 240), (40, 40, 0), 1)
+            
+            cv2.rectangle(frame, (280, 180), (360, 340), (16, 185, 129), 2)
+            cv2.putText(frame, "HUMAN: 95.8%", (280, 172), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (16, 185, 129), 2)
+            cv2.circle(frame, (320, 260), 6, (16, 185, 129), -1)
+            cv2.putText(frame, "AI DETECTOR SNAPSHOT (DEMO)", (180, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (254, 242, 0), 1)
+            
+            _, buffer = cv2.imencode('.jpg', frame)
+            b64_str = base64.b64encode(buffer).decode('utf-8')
+            
+            return jsonify({
+                "status": "success",
+                "human_detected": True,
+                "confidence_pct": 95.8,
+                "box_count": 1,
+                "boxes": [{"x": 280, "y": 180, "w": 80, "h": 160, "confidence": 0.958}],
+                "image": f"data:image/jpeg;base64,{b64_str}"
+            }), 200
+            
+        clean_url = target_url.strip()
+        if not clean_url.startswith(('http://', 'https://')):
+            clean_url = 'http://' + clean_url
+            
+        resp = requests.get(clean_url, timeout=5)
+        if resp.status_code != 200:
+            return jsonify({"status": "error", "message": "Failed to retrieve frame from camera"}), 502
+            
+        np_arr = np.frombuffer(resp.content, dtype=np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        if frame is None:
+            return jsonify({"status": "error", "message": "Failed to decode camera frame"}), 500
+            
+        frame, detected, conf, boxes = detect_humans(frame)
+        
+        _, buffer = cv2.imencode('.jpg', frame)
+        b64_str = base64.b64encode(buffer).decode('utf-8')
+        
+        return jsonify({
+            "status": "success",
+            "human_detected": detected,
+            "confidence_pct": round(conf * 100, 1),
+            "box_count": len(boxes),
+            "boxes": boxes,
+            "image": f"data:image/jpeg;base64,{b64_str}"
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/')
 def serve_index():
