@@ -1,16 +1,33 @@
-
+/**
+ * TERRA-SENSE AI - ESP32-CAM Video Stream Node
+ * Connects to Sensor ESP32's WiFi hotspot as a client (STA mode)
+ * Serves: /stream (MJPEG live), /capture (single JPEG), /led (flash control)
+ * 
+ * IMPORTANT: Power ON the Sensor ESP32 FIRST so its hotspot is running
+ * before booting this ESP32-CAM.
+ * 
+ * Hardware: AI-Thinker ESP32-CAM module
+ * Status LED (GPIO 33): Slow blink = connecting, Solid ON = connected, Fast blink = camera error
+ * Flash LED (GPIO 4): Controllable via /led?state=on|off
+ */
 
 #include "esp_camera.h"
 #include <WiFi.h>
 #include "esp_http_server.h"
+#include "soc/soc.h"            // Brownout detector disable
+#include "soc/rtc_cntl_reg.h"   // Brownout detector register
 
 // =====================================
 // --- Wi-Fi: Connect to Sensor ESP32's Hotspot ---
 // =====================================
-// The sensor ESP32 creates WiFi hotspot "TERRA-SENSE-ESP32".
-// This ESP32-CAM joins that same network as a client.
 const char* ssid = "TERRA-SENSE-ESP32";
 const char* password = "1234567890";
+
+// WiFi connection settings
+#define WIFI_CONNECT_TIMEOUT_MS  15000   // 15 seconds per attempt
+#define WIFI_MAX_RETRIES         10      // Max connection attempts before reboot
+#define WIFI_RECONNECT_DELAY_MS  3000    // Wait between retry attempts
+#define WIFI_CHECK_INTERVAL_MS   5000    // Check WiFi health every 5s in loop
 
 // =====================================
 // --- Camera Pin Mapping (AI-Thinker ESP32-CAM) ---
@@ -33,7 +50,7 @@ const char* password = "1234567890";
 #define PCLK_GPIO_NUM    22
 
 // Pin Definitions for Status & Flash LEDs
-#define STATUS_LED_PIN   33
+#define STATUS_LED_PIN   33   // Onboard LED (active-LOW: LOW = ON, HIGH = OFF)
 #define FLASH_LED_PIN     4
 
 // Stream Boundary Strings for MJPEG HTTP Content Type
@@ -45,8 +62,83 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 // HTTP Server Handle
 httpd_handle_t camera_httpd = NULL;
 
+// WiFi health tracking
+unsigned long lastWifiCheckTime = 0;
+
 // --- Function Declarations ---
 void startCameraServer();
+bool connectToWiFi();
+void statusLedBlink(int onMs, int offMs, int count);
+
+// =============================================
+// --- WiFi Connection with Retries & Timeout ---
+// =============================================
+bool connectToWiFi() {
+  int retryCount = 0;
+
+  while (retryCount < WIFI_MAX_RETRIES) {
+    retryCount++;
+    Serial.printf("\n[WiFi] Attempt %d/%d: Connecting to '%s'...\n", retryCount, WIFI_MAX_RETRIES, ssid);
+
+    WiFi.disconnect(true);   // Clear any stale connection state
+    delay(200);
+    WiFi.mode(WIFI_STA);     // Station mode (client)
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(ssid, password);
+
+    // Wait up to WIFI_CONNECT_TIMEOUT_MS for connection
+    unsigned long startAttempt = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - startAttempt) < WIFI_CONNECT_TIMEOUT_MS) {
+      delay(500);
+      Serial.print(".");
+      // Blink status LED while connecting (slow blink)
+      digitalWrite(STATUS_LED_PIN, LOW);  delay(100);
+      digitalWrite(STATUS_LED_PIN, HIGH); delay(400);
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("\n[WiFi] *** CONNECTED! ***");
+      Serial.print("[WiFi] IP Address: ");
+      Serial.println(WiFi.localIP());
+      Serial.print("[WiFi] Gateway (Sensor ESP32): ");
+      Serial.println(WiFi.gatewayIP());
+      Serial.print("[WiFi] Signal Strength (RSSI): ");
+      Serial.print(WiFi.RSSI());
+      Serial.println(" dBm");
+      
+      // Solid LED ON to indicate connected
+      digitalWrite(STATUS_LED_PIN, LOW);
+      return true;
+    }
+
+    // Connection failed — show error reason
+    wl_status_t status = WiFi.status();
+    Serial.printf("\n[WiFi] Attempt %d failed. Status code: %d ", retryCount, status);
+    switch (status) {
+      case WL_NO_SSID_AVAIL: Serial.println("(Hotspot not found! Is Sensor ESP32 ON?)"); break;
+      case WL_CONNECT_FAILED: Serial.println("(Wrong password or connection refused)"); break;
+      case WL_IDLE_STATUS: Serial.println("(WiFi idle — retrying)"); break;
+      default: Serial.println("(Unknown reason)"); break;
+    }
+
+    // Blink fast to indicate error
+    statusLedBlink(100, 100, 5);
+    delay(WIFI_RECONNECT_DELAY_MS);
+  }
+
+  Serial.println("[WiFi] !!! ALL RETRIES EXHAUSTED — REBOOTING IN 5 SECONDS !!!");
+  delay(5000);
+  ESP.restart();
+  return false; // Never reached, but keeps compiler happy
+}
+
+// --- Status LED Helper ---
+void statusLedBlink(int onMs, int offMs, int count) {
+  for (int i = 0; i < count; i++) {
+    digitalWrite(STATUS_LED_PIN, LOW);  delay(onMs);
+    digitalWrite(STATUS_LED_PIN, HIGH); delay(offMs);
+  }
+}
 
 // --- 1. Single JPEG Capture Handler ---
 static esp_err_t capture_handler(httpd_req_t *req) {
@@ -179,15 +271,20 @@ void startCameraServer() {
 }
 
 void setup() {
+  // Disable brownout detector — prevents boot-loop on weak external power (Vin from another ESP32)
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
   Serial.begin(115200);
+  delay(2000); // Wait 2s for external power supply to stabilize
   Serial.setDebugOutput(true);
   Serial.println("\n--- TERRA-SENSE AI: ESP32-CAM Video Stream Node Booting ---");
   
+  // Init LEDs first for visual feedback
   pinMode(STATUS_LED_PIN, OUTPUT);
-  digitalWrite(STATUS_LED_PIN, HIGH); // Onboard LED active-low (HIGH = OFF)
+  digitalWrite(STATUS_LED_PIN, HIGH); // OFF initially (active-low)
 
   pinMode(FLASH_LED_PIN, OUTPUT);
-  digitalWrite(FLASH_LED_PIN, LOW); // Flash LED initially OFF
+  digitalWrite(FLASH_LED_PIN, LOW);   // Flash LED OFF
 
   // Configure Camera Pins & Settings
   camera_config_t config;
@@ -205,19 +302,22 @@ void setup() {
   config.pin_pclk = PCLK_GPIO_NUM;
   config.pin_vsync = VSYNC_GPIO_NUM;
   config.pin_href = HREF_GPIO_NUM;
-  config.pin_sscb_sda = SIOD_GPIO_NUM;
-  config.pin_sscb_scl = SIOC_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;   // Fixed: was pin_sscb_sda (deprecated typo)
+  config.pin_sccb_scl = SIOC_GPIO_NUM;   // Fixed: was pin_sscb_scl (deprecated typo)
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;  // 10MHz (lower power draw for external power)
   config.pixel_format = PIXFORMAT_JPEG;
+  config.grab_mode = CAMERA_GRAB_LATEST; // Always grab the latest frame
   
   if (psramFound()) {
-    config.frame_size = FRAMESIZE_VGA;  // 640x480 resolution
-    config.jpeg_quality = 12;            // Quality 0-63
+    Serial.println("[Camera] PSRAM found — using VGA (640x480)");
+    config.frame_size = FRAMESIZE_VGA;
+    config.jpeg_quality = 12;
     config.fb_count = 2;
   } else {
-    config.frame_size = FRAMESIZE_CIF;  // Lower size if no PSRAM
+    Serial.println("[Camera] No PSRAM — using CIF (352x288)");
+    config.frame_size = FRAMESIZE_CIF;
     config.jpeg_quality = 12;
     config.fb_count = 1;
   }
@@ -225,28 +325,19 @@ void setup() {
   // Camera Init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
-    Serial.printf("[Camera] Init failed with error 0x%x\n", err);
+    Serial.printf("[Camera] Init FAILED with error 0x%x\n", err);
+    Serial.println("[Camera] Check: Is the camera ribbon cable seated properly?");
+    // Fast blink = camera hardware error
     while (true) {
-      digitalWrite(STATUS_LED_PIN, LOW); delay(100);
-      digitalWrite(STATUS_LED_PIN, HIGH); delay(100);
+      statusLedBlink(100, 100, 1);
     }
   }
   
   Serial.println("[Camera] Init success.");
 
-  // Connect to Sensor ESP32's WiFi Hotspot
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.printf("[WiFi] Connecting to '%s'...", ssid);
-  
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  
-  Serial.println("\n[WiFi] Connected!");
-  Serial.print("[WiFi] IP Address: ");
-  Serial.println(WiFi.localIP());
+  // *** Connect to Sensor ESP32's WiFi Hotspot ***
+  // This will retry multiple times and reboot if it fails
+  connectToWiFi();
 
   // Start HTTP Web & Stream Server
   startCameraServer();
@@ -257,15 +348,35 @@ void setup() {
   Serial.print("  Dashboard:     http://"); Serial.print(WiFi.localIP()); Serial.println("/");
   Serial.print("  Camera Stream: http://"); Serial.print(WiFi.localIP()); Serial.println("/stream");
   Serial.print("  Photo Capture: http://"); Serial.print(WiFi.localIP()); Serial.println("/capture");
+  Serial.print("  Flash LED:     http://"); Serial.print(WiFi.localIP()); Serial.println("/led?state=on");
   Serial.println("================================================\n");
   
-  // LED Status Blink
-  digitalWrite(STATUS_LED_PIN, LOW); // ON
+  // Solid LED ON for 2 seconds = success
+  digitalWrite(STATUS_LED_PIN, LOW);
   delay(2000);
-  digitalWrite(STATUS_LED_PIN, HIGH); // OFF
+  digitalWrite(STATUS_LED_PIN, HIGH);
 }
 
 void loop() {
-  // Yield to FreeRTOS background tasks
+  // Periodically check WiFi connection health and reconnect if lost
+  unsigned long now = millis();
+  if (now - lastWifiCheckTime >= WIFI_CHECK_INTERVAL_MS) {
+    lastWifiCheckTime = now;
+    
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("[WiFi] CONNECTION LOST — Reconnecting...");
+      digitalWrite(STATUS_LED_PIN, HIGH); // LED OFF = disconnected
+      connectToWiFi();
+      // Restart HTTP server after reconnect
+      if (camera_httpd != NULL) {
+        httpd_stop(camera_httpd);
+        camera_httpd = NULL;
+      }
+      startCameraServer();
+      Serial.print("[WiFi] Reconnected! New IP: ");
+      Serial.println(WiFi.localIP());
+    }
+  }
+
   delay(10);
 }

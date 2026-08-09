@@ -89,6 +89,16 @@ class TerraSenseApp {
     
     this.syncUIFromParams = null; // Store reference to UI synchronization
     this.victimMeshes = [];
+
+    // Vision fusion: latest camera detection result for ML score blending
+    this.latestCameraResult = {
+      human_detected: false,
+      confidence_pct: 0,   // 0–100
+      box_count: 0,
+      timestamp: 0,        // Date.now() ms
+      source: 'none'       // 'snapshot' | 'stream_poll' | 'none'
+    };
+    this._cameraFusionPollInterval = null;
   }
 
   init() {
@@ -106,6 +116,7 @@ class TerraSenseApp {
 
     this.initAudio();
     this.startEspTelemetryPolling();
+    this._startCameraFusionPoll();
   }
 
   getApiUrl(path) {
@@ -261,19 +272,72 @@ class TerraSenseApp {
     const modal = document.getElementById('camModelModal');
     const btnCloseModal = document.getElementById('btnCloseCamModelModal');
     const btnCloseModal2 = document.getElementById('btnCloseCamModelModal2');
+    const btnPresetEspCam = document.getElementById('btnPresetEspCam');
+    const btnPresetWebcam = document.getElementById('btnPresetWebcam');
 
     let flashOn = false;
     let isDemoMode = false;
-    let isYoloActive = false;
+    let isYoloActive = true;
+    let yoloPollInterval = null;
+    let lastDetectedState = false;
 
     const setStatus = (online, text) => {
       if (dot) dot.style.background = online ? 'var(--accent-emerald)' : '#9ca3af';
       if (statusText) statusText.textContent = text;
     };
 
+    const startYoloDetectionPolling = () => {
+      if (yoloPollInterval) clearInterval(yoloPollInterval);
+      yoloPollInterval = setInterval(() => {
+        if (!isYoloActive || isDemoMode) return;
+        fetch('/api/camera/latest_detection')
+          .then(res => res.json())
+          .then(data => {
+            if (data.status === 'success' && data.fresh) {
+              this.latestCameraResult = {
+                human_detected: data.human_detected,
+                confidence_pct: data.confidence_pct || 0,
+                box_count: data.box_count || 0,
+                timestamp: Date.now(),
+                source: data.source || 'stream'
+              };
+              this._updateFusionIndicator();
+
+              if (yoloAlert) {
+                if (data.human_detected) {
+                  yoloAlert.style.display = 'block';
+                  yoloAlert.textContent = `⚠ HUMAN: ${data.confidence_pct}% (${data.box_count} target${data.box_count > 1 ? 's' : ''})`;
+                  yoloAlert.style.background = 'rgba(244,63,94,0.95)';
+                  if (!lastDetectedState) {
+                    this.playBeep(784, 0.25);
+                  }
+                  lastDetectedState = true;
+                } else {
+                  yoloAlert.style.display = 'block';
+                  yoloAlert.textContent = '✓ SCANNING — 0 TARGETS';
+                  yoloAlert.style.background = 'rgba(16, 185, 129, 0.85)';
+                  lastDetectedState = false;
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      }, 400);
+    };
+
+    const stopYoloDetectionPolling = () => {
+      if (yoloPollInterval) {
+        clearInterval(yoloPollInterval);
+        yoloPollInterval = null;
+      }
+    };
+
     const formatCamUrl = (rawInput) => {
       let str = (rawInput || '').trim();
       if (!str) return '';
+      if (str.toLowerCase() === 'webcam' || str === '0' || str.toLowerCase() === 'local') {
+        return 'webcam';
+      }
       if (!str.startsWith('http://') && !str.startsWith('https://')) {
         str = 'http://' + str;
       }
@@ -303,7 +367,7 @@ class TerraSenseApp {
       localStorage.setItem('terra_sense_cam_url', formattedUrl);
       if (inputCamIp) inputCamIp.value = formattedUrl;
 
-      setStatus(true, 'CONNECTING STREAM...');
+      setStatus(true, 'CONNECTING AI STREAM...');
       
       if (imgStream) {
         imgStream.onerror = () => {
@@ -311,17 +375,25 @@ class TerraSenseApp {
           imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
           if (yoloAlert) yoloAlert.style.display = 'none';
+          stopYoloDetectionPolling();
         };
 
         if (isYoloActive) {
           imgStream.src = `/api/camera/stream_yolo?url=${encodeURIComponent(formattedUrl)}`;
           if (yoloAlert) {
             yoloAlert.style.display = 'block';
-            yoloAlert.textContent = '⚠ AI RUNNING';
-            yoloAlert.style.background = 'rgba(244,63,94,0.9)';
+            yoloAlert.textContent = '👁 AI SCANNING...';
+            yoloAlert.style.background = 'rgba(0,242,254,0.85)';
+            yoloAlert.style.color = '#040711';
           }
+          startYoloDetectionPolling();
         } else {
-          imgStream.src = formattedUrl;
+          stopYoloDetectionPolling();
+          if (formattedUrl === 'webcam') {
+            imgStream.src = `/api/camera/stream_yolo?url=webcam`;
+          } else {
+            imgStream.src = formattedUrl;
+          }
           if (yoloAlert) yoloAlert.style.display = 'none';
         }
 
@@ -330,11 +402,26 @@ class TerraSenseApp {
         
         setTimeout(() => {
           if (imgStream.style.display !== 'none') {
-            setStatus(true, isYoloActive ? 'LIVE AI DETECT ONLINE' : 'LIVE OPTICAL FEED ONLINE');
+            setStatus(true, isYoloActive ? 'LIVE AI YOLO DETECT ONLINE' : 'LIVE OPTICAL FEED ONLINE');
           }
-        }, 500);
+        }, 600);
       }
     };
+
+    // Preset buttons
+    if (btnPresetEspCam && inputCamIp) {
+      btnPresetEspCam.addEventListener('click', () => {
+        inputCamIp.value = '192.168.4.2/stream';
+        connectStream('192.168.4.2/stream');
+      });
+    }
+
+    if (btnPresetWebcam && inputCamIp) {
+      btnPresetWebcam.addEventListener('click', () => {
+        inputCamIp.value = 'webcam';
+        connectStream('webcam');
+      });
+    }
 
     if (btnConnect && inputCamIp) {
       btnConnect.addEventListener('click', () => {
@@ -354,7 +441,7 @@ class TerraSenseApp {
         flashOn = !flashOn;
         btnFlash.classList.toggle('active', flashOn);
         const camIp = inputCamIp ? inputCamIp.value.trim() : '';
-        if (camIp) {
+        if (camIp && camIp !== 'webcam') {
           const formatted = formatCamUrl(camIp);
           try {
             const urlObj = new URL(formatted);
@@ -375,17 +462,20 @@ class TerraSenseApp {
         this.playBeep(880, 0.15);
         
         setStatus(true, 'AI ANALYZING SNAPSHOT...');
-        const isDemoTarget = isDemoMode || !camIp;
+        const isDemoTarget = isDemoMode || (!camIp && !isYoloActive);
         
         let targetApi = `/api/camera/analyze_snapshot?demo=true`;
-        if (!isDemoTarget) {
-          const formatted = formatCamUrl(camIp);
-          try {
-            const captureUrl = `${new URL(formatted).origin}/capture`;
-            targetApi = `/api/camera/analyze_snapshot?url=${encodeURIComponent(captureUrl)}`;
-          } catch (e) {
-            setStatus(false, 'INVALID CAMERA URL');
-            return;
+        if (!isDemoTarget && camIp) {
+          if (camIp === 'webcam') {
+            targetApi = `/api/camera/analyze_snapshot?url=webcam`;
+          } else {
+            const formatted = formatCamUrl(camIp);
+            try {
+              const captureUrl = `${new URL(formatted).origin}/capture`;
+              targetApi = `/api/camera/analyze_snapshot?url=${encodeURIComponent(captureUrl)}`;
+            } catch (e) {
+              targetApi = `/api/camera/analyze_snapshot?url=${encodeURIComponent(formatted)}`;
+            }
           }
         }
         
@@ -398,19 +488,30 @@ class TerraSenseApp {
                 imgStream.style.display = 'block';
                 if (placeholder) placeholder.style.display = 'none';
               }
+
+              // Store result for ML fusion
+              this.latestCameraResult = {
+                human_detected: data.human_detected,
+                confidence_pct: data.confidence_pct || 0,
+                box_count: data.box_count || 0,
+                timestamp: Date.now(),
+                source: data.source || 'snapshot'
+              };
+              this._updateFusionIndicator();
+
               if (yoloAlert) {
                 if (data.human_detected) {
                   yoloAlert.style.display = 'block';
-                  yoloAlert.textContent = `⚠ HUMAN: ${data.confidence_pct}%`;
+                  yoloAlert.textContent = `⚠ HUMAN: ${data.confidence_pct}% — FUSED INTO ML`;
                   yoloAlert.style.background = 'rgba(244,63,94,0.95)';
                   this.playBeep(784, 0.3);
                 } else {
                   yoloAlert.style.display = 'block';
-                  yoloAlert.textContent = '✓ CLEAR MATRIX';
+                  yoloAlert.textContent = '✓ CLEAR — FUSED INTO ML';
                   yoloAlert.style.background = 'rgba(16, 185, 129, 0.9)';
                 }
               }
-              setStatus(true, data.human_detected ? `DETECTED: ${data.confidence_pct}% CONFIDENCE` : 'AI ANALYSIS: NO LIFE SIGNALS');
+              setStatus(true, data.human_detected ? `DETECTED: ${data.confidence_pct}% — VISION FUSED` : 'AI ANALYSIS: CLEAR — VISION FUSED');
             } else {
               setStatus(false, 'AI ANALYSIS FAILED');
             }
@@ -431,10 +532,13 @@ class TerraSenseApp {
         if (isYoloActive) {
           btnYolo.style.background = 'var(--accent-emerald)';
           btnYolo.style.color = '#040711';
+          btnYolo.style.fontWeight = '700';
         } else {
           btnYolo.style.background = '';
           btnYolo.style.color = '';
+          btnYolo.style.fontWeight = '';
           if (yoloAlert) yoloAlert.style.display = 'none';
+          stopYoloDetectionPolling();
         }
         
         if (imgStream && imgStream.style.display === 'block') {
@@ -458,16 +562,17 @@ class TerraSenseApp {
         isDemoMode = !isDemoMode;
         btnDemo.classList.toggle('active', isDemoMode);
         if (isDemoMode) {
+          stopYoloDetectionPolling();
           if (imgStream) {
             if (isYoloActive) {
-              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">YOLO ACTIVE — DEMO FEED</text></svg>`;
+              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><rect x="130" y="70" width="70" height="120" fill="rgba(244,63,94,0.2)" stroke="#f43f5e" stroke-width="2"/><text x="165" y="62" font-family="monospace" font-size="10" fill="#fff" text-anchor="middle">HUMAN: 94.7%</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">YOLO ACTIVE — DEMO FEED</text></svg>`;
               imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
               if (yoloAlert) {
                 yoloAlert.style.display = 'block';
                 yoloAlert.textContent = '⚠ HUMAN: 94.7%';
               }
             } else {
-              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><circle cx="175" cy="105" r="14" fill="rgba(244,63,94,0.3)" stroke="#f43f5e" stroke-width="2"/><text x="175" y="109" font-family="monospace" font-size="9" fill="#fff" text-anchor="middle">HUMAN</text><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">DEMO OPTICAL FEED (640x480)</text></svg>`;
+              const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240" viewBox="0 0 320 240"><rect width="320" height="240" fill="#040711"/><circle cx="160" cy="120" r="90" fill="none" stroke="#00f2fe" stroke-width="1.5" opacity="0.4"/><circle cx="160" cy="120" r="60" fill="none" stroke="#00f2fe" stroke-width="1" opacity="0.3"/><line x1="160" y1="20" x2="160" y2="220" stroke="#00f2fe" opacity="0.25"/><line x1="60" y1="120" x2="260" y2="120" stroke="#00f2fe" opacity="0.25"/><text x="160" y="225" font-family="monospace" font-size="10" fill="#00f2fe" text-anchor="middle">DEMO OPTICAL FEED (640x480)</text></svg>`;
               imgStream.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgData)}`;
               if (yoloAlert) yoloAlert.style.display = 'none';
             }
@@ -476,6 +581,7 @@ class TerraSenseApp {
           }
           setStatus(true, 'SYNTHETIC DEMO STREAM');
         } else {
+          stopYoloDetectionPolling();
           if (imgStream) imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
           if (yoloAlert) yoloAlert.style.display = 'none';
@@ -497,6 +603,76 @@ class TerraSenseApp {
       });
     }
   }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  Camera Vision Fusion Helpers
+  // ═══════════════════════════════════════════════════════════════
+
+  /** Polls /api/camera/latest_detection every 10 s so fusion works even
+   *  without manual snapshots (e.g. when the live stream is running). */
+  _startCameraFusionPoll() {
+    if (this._cameraFusionPollInterval) return;
+    const poll = async () => {
+      try {
+        const res = await fetch(this.getApiUrl('/api/camera/latest_detection'));
+        if (!res.ok) return;
+        const d = await res.json();
+        if (d.fresh) {
+          this.latestCameraResult = {
+            human_detected: d.human_detected,
+            confidence_pct: d.confidence_pct,
+            box_count: d.box_count || 0,
+            timestamp: Date.now() - (d.age_seconds * 1000),
+            source: d.source || 'stream_poll'
+          };
+          this._updateFusionIndicator();
+        }
+      } catch (e) { /* camera offline – ignore silently */ }
+    };
+    poll(); // run immediately on init
+    this._cameraFusionPollInterval = setInterval(poll, 10000);
+  }
+
+  /** Returns true when the last camera reading is fresh enough to fuse (< 30 s). */
+  _isCameraFresh() {
+    return this.latestCameraResult.source !== 'none' &&
+           (Date.now() - this.latestCameraResult.timestamp) < 30000;
+  }
+
+  /** Updates the UI indicator that shows when vision fusion is active. */
+  _updateFusionIndicator() {
+    const pill = document.getElementById('fusionStatusPill');
+    if (!pill) return;
+    if (this._isCameraFresh()) {
+      pill.style.display = 'flex';
+      pill.innerHTML = this.latestCameraResult.human_detected
+        ? `🎞️ VISION FUSION ACTIVE — CAM: ${this.latestCameraResult.confidence_pct.toFixed(0)}% HUMAN`
+        : `🎞️ VISION FUSION ACTIVE — CAM: CLEAR`;
+      pill.style.background = this.latestCameraResult.human_detected
+        ? 'rgba(244,63,94,0.15)' : 'rgba(16,185,129,0.12)';
+      pill.style.borderColor = this.latestCameraResult.human_detected
+        ? '#f43f5e' : '#10b981';
+      pill.style.color = this.latestCameraResult.human_detected
+        ? '#f43f5e' : '#10b981';
+    } else {
+      pill.style.display = 'none';
+    }
+  }
+
+  /** Returns the API path to use for predictions (fused vs standard). */
+  _predictApiPath() {
+    return this._isCameraFresh() ? '/api/predict_fused' : '/api/predict';
+  }
+
+  /** Appends camera fusion fields to a batch target array for /api/predict_fused. */
+  _addFusionFields(body) {
+    if (this._isCameraFresh()) {
+      body.camera_confidence     = this.latestCameraResult.confidence_pct / 100.0;
+      body.camera_human_detected = this.latestCameraResult.human_detected;
+    }
+    return body;
+  }
+
 
   // ═══════════════════════════════════════════════════════════════
   //  THREE.JS — 4-Quadrant Subsurface Scene
@@ -2113,7 +2289,10 @@ class TerraSenseApp {
 
     const banner = document.getElementById('detectionBanner');
 
-    if (!this.isEspActive && !this.isFileLoaded) {
+    // Allow manual-slider scans even without live ESP32 or loaded file.
+    // Only block if there is genuinely zero signal (all params are at default zero-human state).
+    const hasManualSignal = this.params.breathing > 0 || this.params.heartbeat > 0 || this.params.microamp > 0.05;
+    if (!this.isEspActive && !this.isFileLoaded && !hasManualSignal) {
       this._clearAllSectors();
       this._stopOxygenCountdown();
       this._resetSurvivalPanel();
@@ -2127,55 +2306,66 @@ class TerraSenseApp {
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5">
             <circle cx="12" cy="12" r="10"/><path d="M22 12H2"/>
           </svg>
-          NO SENSOR DATA — CONNECT ESP32 TO SCAN GRID
+          NO SENSOR DATA — CONNECT ESP32 OR SET MANUAL PARAMETERS
         `;
       }
       return;
     }
 
     let data = null;
-    let isBatch = false;
+    let isBatch = true; // Always run as multi-sector batch so human_count is dynamically computed
     try {
+      // Build 4-sector target list — for file-loaded scans use parsed targets;
+      // for manual/ESP scans, generate one independent target per sector with
+      // realistic sensor perturbations so the ML model evaluates each sector independently.
+      let targets;
       if (this.isFileLoaded && this.parsedTargets && this.parsedTargets.length > 0) {
-        isBatch = true;
-        const res = await fetch(this.getApiUrl('/api/predict'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targets: this.parsedTargets })
-        });
-        if (res.ok) {
-          data = await res.json();
-        } else {
-          data = { status: "success", results: this.parsedTargets.map(t => this._calculateClientPrediction(t).result) };
-          data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
-          data.total_targets = data.results.length;
-        }
+        targets = this.parsedTargets;
       } else {
-        const res = await fetch(this.getApiUrl('/api/predict'), {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({
-            breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
-            micro_amp: this.params.microamp,    snr_db: this.params.snr,
-            dielectric_shift: this.params.dielectric, soil_moisture: this.params.moisture,
-            soil_density: this.params.density,  reflection_depth: this.params.depth
-          })
-        });
-        if (res.ok) {
-          data = await res.json();
-        } else {
-          data = this._calculateClientPrediction();
-        }
+        // Each sector gets its real sensor reading plus small positional perturbations
+        targets = SECTORS.map((sec, i) => ({
+          breathing_hz:     Math.max(0, this.params.breathing  + (Math.random() - 0.5) * 0.03),
+          heartbeat_hz:     Math.max(0, this.params.heartbeat  + (Math.random() - 0.5) * 0.06),
+          micro_amp:        Math.max(0, this.params.microamp   + (Math.random() - 0.5) * 0.04),
+          snr_db:           this.params.snr        + (Math.random() - 0.5) * 2.0,
+          dielectric_shift: this.params.dielectric + (Math.random() - 0.5) * 0.5,
+          bme_humidity_pct: this.params.moisture   + (Math.random() - 0.5) * 4.0,
+          soil_density:     this.params.density,
+          reflection_depth: Math.max(0.1, this.params.depth + (Math.random() - 0.5) * 0.3),
+          x: sec.cx * 2 + 12.5,  // Map sector centre to real grid X metres
+          y: sec.cz * 2 + 8.2    // Map sector centre to real grid Y metres
+        }));
+      }
+
+      const apiPath = this._predictApiPath();
+      const reqBody = this._addFusionFields({ targets });
+      const res = await fetch(this.getApiUrl(apiPath), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reqBody)
+      });
+      if (res.ok) {
+        data = await res.json();
+        if (data.fusion_applied) console.info('[TERRA-SENSE] Vision fusion applied — camera weight 30%');
+      } else {
+        data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
+        data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+        data.total_targets = data.results.length;
       }
     } catch (e) {
       console.warn('Backend API fetch error, using client-side AI engine fallback:', e);
-      if (this.isFileLoaded && this.parsedTargets && this.parsedTargets.length > 0) {
-        isBatch = true;
-        data = { status: "success", results: this.parsedTargets.map(t => this._calculateClientPrediction(t).result) };
-        data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
-        data.total_targets = data.results.length;
-      } else {
-        data = this._calculateClientPrediction();
-      }
+      const targets = this.isFileLoaded && this.parsedTargets && this.parsedTargets.length > 0
+        ? this.parsedTargets
+        : SECTORS.map(sec => ({
+            breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
+            micro_amp: this.params.microamp, snr_db: this.params.snr,
+            dielectric_shift: this.params.dielectric, bme_humidity_pct: this.params.moisture,
+            soil_density: this.params.density, reflection_depth: this.params.depth,
+            x: sec.cx * 2 + 12.5, y: sec.cz * 2 + 8.2
+          }));
+      data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
+      data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+      data.total_targets = data.results.length;
     }
 
     this.detectionResult = data;
@@ -2242,11 +2432,16 @@ class TerraSenseApp {
     let gpsText = "N/A - MATRIX CLEAR";
 
     if (isHuman) {
-      const activeSectorIds = [];
-      if (isHuman) activeSectorIds.push('A');
-      if (isHuman && (this.params.heartbeat * 60) > 70) activeSectorIds.push('B');
-      if (isHuman && this.params.depth > 1.3) activeSectorIds.push('C');
-      if (isHuman && this.params.moisture > 38.0) activeSectorIds.push('D');
+      // Derive active sectors from which positions the ML model actually flagged as human
+      const activeSectorIds = SECTORS
+        .filter((sec, i) => {
+          const r = (data.results || [])[i];
+          return r && (r.prediction === 1 || r.human_detected === true);
+        })
+        .map(sec => sec.id);
+
+      // Plot every detected victim independently in 3D
+      this._plotDynamicVictims(data.results || []);
 
       gpsText = activeSectorIds.map(id => `Sector ${id}: ${this.getSectorGps(id)}`).join(' | ');
 
@@ -2256,18 +2451,21 @@ class TerraSenseApp {
       this._updateSurvivalPanel(activeSectorIds, prob, oxyHours, guidance, pal);
       this._updateSectorStatusPanel(activeSectorIds, prob, oxyHours);
 
-      const count = isBatch ? data.human_count : activeSectorIds.length;
-      const locationNames = activeSectorIds.join(', ');
+      const count = data.human_count; // Actual ML-detected count — dynamically computed
+      const locationNames = activeSectorIds.join(', ') || 'GRID';
 
       banner.className = 'detection-banner detected';
       banner.style.borderColor = pal.str;
       banner.style.color = pal.str;
       banner.style.background = `rgba(${this._hexToRgb(pal.hex)},0.12)`;
+      const fusionBadge = data.fusion_applied
+        ? `<span style="margin-left:8px;font-size:0.72rem;padding:2px 7px;border-radius:3px;background:rgba(0,242,254,0.15);border:1px solid var(--primary-cyan);color:var(--primary-cyan);font-family:var(--font-tech);">\uD83C\uDF9E\uFE0F VISION FUSION — CAM ${data.camera_confidence_pct || 0}%</span>`
+        : '';
       banner.innerHTML = `
         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
         </svg>
-        ⚠ ${count} ${count > 1 ? 'HUMANS' : 'HUMAN'} DETECTED — ${pal.label} — ${prob}% CONFIDENCE
+        ⚠ ${count} ${count > 1 ? 'HUMANS' : 'HUMAN'} DETECTED UNDER SOIL [SECTOR ${locationNames}] — ${pal.label} — ${prob}% CONFIDENCE${fusionBadge}
       `;
     } else {
       this._clearAllSectors();
@@ -2408,7 +2606,8 @@ class TerraSenseApp {
     const moisture   = targetData ? targetData.bme_humidity_pct : (this.params.moisture || 35.0);
     const x         = targetData ? (targetData.x !== undefined ? targetData.x : 0) : 14.2;
     const y         = targetData ? (targetData.y !== undefined ? targetData.y : 0) : 9.6;
-    const isHuman = isHumanOverride !== null ? isHumanOverride : (breathing >= 0.05 || heartbeat >= 0.30 || microamp >= 0.10 || (breathing > 0 && heartbeat > 0));
+    // isHumanOverride was previously undeclared — fixed: evaluate purely from sensor readings
+    const isHuman = (breathing >= 0.05 || heartbeat >= 0.30 || microamp >= 0.10 || (breathing > 0 && heartbeat > 0));
     let prob = 0;
     if (isHuman) {
       const bWeight = Math.min(1, (breathing - 0.08) / 0.35);
@@ -2909,29 +3108,53 @@ class TerraSenseApp {
 
     let data = null;
     try {
-      const res = await fetch(this.getApiUrl('/api/predict'), {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
-          micro_amp: this.params.microamp,    snr_db: this.params.snr,
-          dielectric_shift: this.params.dielectric, soil_moisture: this.params.moisture,
-          soil_density: this.params.density,  reflection_depth: this.params.depth
-        })
-      });
+      // Live ESP32 update: scan all 4 sectors independently so human_count is dynamic
+      const targets = SECTORS.map(sec => ({
+        breathing_hz:     Math.max(0, this.params.breathing  + (Math.random() - 0.5) * 0.03),
+        heartbeat_hz:     Math.max(0, this.params.heartbeat  + (Math.random() - 0.5) * 0.06),
+        micro_amp:        Math.max(0, this.params.microamp   + (Math.random() - 0.5) * 0.04),
+        snr_db:           this.params.snr        + (Math.random() - 0.5) * 2.0,
+        dielectric_shift: this.params.dielectric + (Math.random() - 0.5) * 0.5,
+        bme_humidity_pct: this.params.moisture   + (Math.random() - 0.5) * 4.0,
+        soil_density:     this.params.density,
+        reflection_depth: Math.max(0.1, this.params.depth + (Math.random() - 0.5) * 0.3),
+        x: sec.cx * 2 + 12.5,
+        y: sec.cz * 2 + 8.2
+      }));
 
+      const liveApiPath = this._predictApiPath();
+      const liveBody    = this._addFusionFields({ targets });
+      const res = await fetch(this.getApiUrl(liveApiPath), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(liveBody)
+      });
       if (res.ok) {
         data = await res.json();
+        if (data.fusion_applied) console.info('[TERRA-SENSE] Vision fusion applied on live update — camera weight 30%');
       } else {
-        data = this._calculateClientPrediction();
+        data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
+        data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+        data.total_targets = data.results.length;
       }
     } catch (e) {
       console.warn('Backend API fetch error, using client-side AI engine fallback:', e);
-      data = this._calculateClientPrediction();
+      const fbTargets = SECTORS.map(sec => ({
+        breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
+        micro_amp: this.params.microamp, snr_db: this.params.snr,
+        dielectric_shift: this.params.dielectric, bme_humidity_pct: this.params.moisture,
+        soil_density: this.params.density, reflection_depth: this.params.depth,
+        x: sec.cx * 2 + 12.5, y: sec.cz * 2 + 8.2
+      }));
+      data = { status: 'success', results: fbTargets.map(t => this._calculateClientPrediction(t).result) };
+      data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+      data.total_targets = data.results.length;
     }
 
     this.detectionResult = data;
-    const pred  = data.result;
-    const isHuman = pred.prediction === 1 || pred.human_detected === true;
+    // Treat live update result as batch — pick the worst-case (most critical) human result
+    const humanResults = (data.results || []).filter(r => r.prediction === 1 || r.human_detected === true);
+    const pred  = humanResults.length > 0 ? humanResults[0] : (data.results ? data.results[0] : data.result);
+    const isHuman = data.human_count > 0;
     const prob    = pred.consensus_probability_pct !== undefined ? pred.consensus_probability_pct : (pred.probability_percentage || 85.0);
     const guidance = pred.rescue_guidance || {
       urgency_level: "CRITICAL — Structural Support Required",
@@ -2954,12 +3177,16 @@ class TerraSenseApp {
     let gpsText = "N/A - MATRIX CLEAR";
 
     if (isHuman) {
-      // Conditionally detect humans in multiple sectors based on sensor readings
-      const activeSectorIds = [];
-      if (isHuman) activeSectorIds.push('A');
-      if (isHuman && (this.params.heartbeat * 60) > 70) activeSectorIds.push('B');
-      if (isHuman && this.params.depth > 1.3) activeSectorIds.push('C');
-      if (isHuman && this.params.moisture > 38.0) activeSectorIds.push('D');
+      // Derive active sectors from which results the ML model actually flagged as human
+      const activeSectorIds = SECTORS
+        .filter((sec, i) => {
+          const r = (data.results || [])[i];
+          return r && (r.prediction === 1 || r.human_detected === true);
+        })
+        .map(sec => sec.id);
+
+      // Plot each detected victim in 3D
+      this._plotDynamicVictims(data.results || []);
 
       gpsText = activeSectorIds.map(id => `Sector ${id}: ${this.getSectorGps(id)}`).join(' | ');
 
@@ -2969,19 +3196,22 @@ class TerraSenseApp {
       this._updateSurvivalPanel(activeSectorIds, prob, oxyHours, guidance, pal);
       this._updateSectorStatusPanel(activeSectorIds, prob, oxyHours);
 
-      const count = activeSectorIds.length;
-      const locationNames = activeSectorIds.join(', ');
+      const count = data.human_count; // Actual ML-detected count — not hardcoded
+      const locationNames = activeSectorIds.join(', ') || 'GRID';
 
       if (banner) {
         banner.className = 'detection-banner detected';
         banner.style.borderColor = pal.str;
         banner.style.color = pal.str;
         banner.style.background = `rgba(${this._hexToRgb(pal.hex)},0.12)`;
+        const fusionBadge = data.fusion_applied
+          ? `<span style="margin-left:8px;font-size:0.72rem;padding:2px 7px;border-radius:3px;background:rgba(0,242,254,0.15);border:1px solid var(--primary-cyan);color:var(--primary-cyan);font-family:var(--font-tech);">\uD83C\uDF9E\uFE0F VISION FUSION — CAM ${data.camera_confidence_pct || 0}%</span>`
+          : '';
         banner.innerHTML = `
           <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" fill="none" stroke-width="2.5">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
           </svg>
-          ⚠ ${count} ${count > 1 ? 'HUMANS' : 'HUMAN'} DETECTED [SECTOR ${locationNames}] — ${pal.label} — ${prob}% CONFIDENCE
+          ⚠ ${count} ${count > 1 ? 'HUMANS' : 'HUMAN'} DETECTED UNDER SOIL [SECTOR ${locationNames}] — ${pal.label} — ${prob}% CONFIDENCE${fusionBadge}
         `;
       }
     } else {

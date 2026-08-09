@@ -80,6 +80,8 @@
       <div class="status-pill">
         <span>ENGINE: <strong style="color: var(--text-main)">AI Analytics Engine</strong></span>
       </div>
+      <!-- Vision Fusion Indicator — shown dynamically by JS when camera data is fresh -->
+      <div id="fusionStatusPill" class="status-pill" style="display:none;border:1px solid var(--primary-cyan);border-radius:4px;font-family:var(--font-tech);font-size:0.72rem;font-weight:600;letter-spacing:0.04em;padding:3px 10px;transition:all 0.3s;align-items:center;gap:5px;"></div>
     </div>
   </header>
 
@@ -341,14 +343,20 @@
 
           <!-- Controls Toolbar -->
           <div style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem;">
+            <!-- Quick Source Presets -->
+            <div style="display: flex; gap: 0.25rem; font-size: 0.6rem; font-family: var(--font-mono);">
+              <button id="btnPresetEspCam" class="btn-preset-mini" style="flex: 1; padding: 2px 4px; font-size: 0.6rem; margin: 0;" title="Connect to ESP32-CAM (192.168.4.2/stream)">ESP32-CAM</button>
+              <button id="btnPresetWebcam" class="btn-preset-mini" style="flex: 1; padding: 2px 4px; font-size: 0.6rem; margin: 0; color: var(--primary-cyan); border-color: rgba(0,242,254,0.3);" title="Stream & Detect from Local PC/Laptop Webcam">PC WEBCAM</button>
+            </div>
+            
             <div style="display: flex; gap: 0.35rem;">
-              <input type="text" id="inputCamIp" placeholder="192.168.4.2/stream" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 2px 5px; font-family: var(--font-mono); font-size: 0.68rem; outline: none;" />
+              <input type="text" id="inputCamIp" placeholder="192.168.4.2/stream or webcam" style="flex: 1; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); color: #fff; border-radius: 3px; padding: 2px 5px; font-family: var(--font-mono); font-size: 0.68rem; outline: none;" />
               <button id="btnConnectCam" style="background: var(--primary-cyan); border: none; color: #040711; font-weight: 700; border-radius: 3px; font-size: 0.65rem; padding: 2px 7px; cursor: pointer;">CONNECT</button>
             </div>
             <div style="display: flex; justify-content: space-between; gap: 0.35rem;">
               <button id="btnToggleFlash" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Toggle Onboard Flash LED">FLASH LIGHT</button>
               <button id="btnCaptureSnapshot" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Capture Frame for AI Analysis">SNAPSHOT</button>
-              <button id="btnToggleYolo" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem; color: var(--accent-emerald); border-color: rgba(16,185,129,0.3);" title="Toggle YOLOv8 Human Object Detection">YOLO AI: OFF</button>
+              <button id="btnToggleYolo" class="btn-preset-mini active" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem; background: var(--accent-emerald); color: #040711; font-weight: 700; border-color: var(--accent-emerald);" title="Toggle YOLOv8 Human Object Detection">YOLO AI: ON</button>
               <button id="btnDemoCamStream" class="btn-preset-mini" style="flex: 1; margin: 0; padding: 2px 3px; font-size: 0.62rem;" title="Toggle Synthetic Demo Stream">DEMO FEED</button>
             </div>
           </div>

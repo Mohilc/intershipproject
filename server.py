@@ -138,6 +138,17 @@ latest_telemetry = {
     "last_update": 0
 }
 
+# --- Global Latest Camera / YOLO Detection Cache ---
+# Updated by the live YOLO stream on every detected frame and by snapshot analysis.
+# Consumed by /api/predict_fused to apply vision-sensor fusion without an extra fetch.
+latest_camera_result = {
+    "human_detected": False,
+    "confidence": 0.0,        # 0.0 – 1.0
+    "box_count": 0,
+    "last_update": 0.0,       # Unix timestamp
+    "source": "none"          # 'stream' | 'snapshot' | 'none'
+}
+
 @app.route('/api/telemetry', methods=['GET', 'POST', 'OPTIONS'])
 def handle_telemetry():
     global latest_telemetry
@@ -189,6 +200,8 @@ def camera_proxy():
 
 # --- YOLOv8 / OpenCV Human Detection Integration ---
 _yolo_model = None
+_hog_detector = None
+_face_cascade = None
 
 def get_yolo_model():
     global _yolo_model
@@ -202,77 +215,142 @@ def get_yolo_model():
             print(f"[Server] YOLOv8 load warning: {e}")
     return _yolo_model
 
+def get_opencv_fallback():
+    global _hog_detector, _face_cascade
+    if _hog_detector is None:
+        try:
+            _hog_detector = cv2.HOGDescriptor()
+            _hog_detector.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        except Exception as e:
+            print(f"[Server] OpenCV HOG init error: {e}")
+    if _face_cascade is None:
+        try:
+            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            _face_cascade = cv2.CascadeClassifier(cascade_path)
+        except Exception as e:
+            print(f"[Server] OpenCV Haar Cascade init error: {e}")
+    return _hog_detector, _face_cascade
+
+def draw_hud_box(img, x1, y1, x2, y2, label, color=(16, 185, 129)):
+    """Draws a high-visibility futuristic HUD bounding box with corner notches and label."""
+    h_img, w_img = img.shape[:2]
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w_img - 1, x2), min(h_img - 1, y2)
+    w_box = x2 - x1
+    h_box = y2 - y1
+    
+    # Main rectangle
+    cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+    
+    # Corner notches
+    notch_len = min(15, max(5, int(w_box * 0.15)), max(5, int(h_box * 0.15)))
+    cv2.line(img, (x1, y1), (x1 + notch_len, y1), (255, 255, 255), 3)
+    cv2.line(img, (x1, y1), (x1, y1 + notch_len), (255, 255, 255), 3)
+    cv2.line(img, (x2, y1), (x2 - notch_len, y1), (255, 255, 255), 3)
+    cv2.line(img, (x2, y1), (x2, y1 + notch_len), (255, 255, 255), 3)
+    cv2.line(img, (x1, y2), (x1 + notch_len, y2), (255, 255, 255), 3)
+    cv2.line(img, (x1, y2), (x1, y2 - notch_len), (255, 255, 255), 3)
+    cv2.line(img, (x2, y2), (x2 - notch_len, y2), (255, 255, 255), 3)
+    cv2.line(img, (x2, y2), (x2, y2 - notch_len), (255, 255, 255), 3)
+    
+    # Center crosshair
+    cx, cy = x1 + w_box // 2, y1 + h_box // 2
+    cv2.line(img, (cx - 6, cy), (cx + 6, cy), color, 1)
+    cv2.line(img, (cx, cy - 6), (cx, cy + 6), color, 1)
+    
+    # Label banner with solid dark background
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 0.48
+    thickness = 1
+    (text_w, text_h), baseline = cv2.getTextSize(label, font, font_scale, thickness)
+    
+    tag_y = max(y1 - 6, text_h + 8)
+    cv2.rectangle(img, (x1, tag_y - text_h - 6), (x1 + text_w + 10, tag_y + 4), (10, 15, 25), -1)
+    cv2.rectangle(img, (x1, tag_y - text_h - 6), (x1 + text_w + 10, tag_y + 4), color, 1)
+    cv2.putText(img, label, (x1 + 5, tag_y - 2), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
+
 def detect_humans(img):
     """
-    Runs YOLOv8 human detection on a frame.
+    Runs YOLOv8 human detection (or OpenCV fallback) on a frame.
     Returns: (processed_img, human_detected, highest_confidence, boxes)
     """
-    model = get_yolo_model()
+    if img is None:
+        return img, False, 0.0, []
+
     human_detected = False
     highest_conf = 0.0
     boxes_info = []
 
-    if model is None:
-        # Fallback to OpenCV HOG descriptor if YOLO is not available
-        try:
-            hog = cv2.HOGDescriptor()
-            hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
-            h, w = img.shape[:2]
-            scale = 400.0 / w
-            resized = cv2.resize(img, (int(w * scale), int(h * scale)))
-            (rects, weights) = hog.detectMultiScale(resized, winStride=(4, 4), padding=(8, 8), scale=1.05)
-            
-            for (x, y, w_box, h_box), weight in zip(rects, weights):
-                x = int(x / scale)
-                y = int(y / scale)
-                w_box = int(w_box / scale)
-                h_box = int(h_box / scale)
-                conf = float(weight)
-                highest_conf = max(highest_conf, conf)
-                human_detected = True
-                boxes_info.append({"x": x, "y": y, "w": w_box, "h": h_box, "confidence": conf})
-                
-                # Draw bounding box
-                cv2.rectangle(img, (x, y), (x + w_box, y + h_box), (0, 242, 254), 2)
-                cv2.putText(img, f"Person: {conf:.2f}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 242, 254), 1)
-        except Exception as e:
-            print(f"[Server] OpenCV HOG detect failed: {e}")
-        return img, human_detected, highest_conf, boxes_info
+    model = get_yolo_model()
+    yolo_success = False
 
-    try:
-        results = model(img, verbose=False)
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                cls_id = int(box.cls[0])
-                if cls_id == 0:  # Person class
+    if model is not None:
+        try:
+            # classes=[0] selects only 'person' class in COCO; imgsz=320 ensures 20+ FPS
+            results = model.predict(img, classes=[0], conf=0.25, imgsz=320, verbose=False)
+            yolo_success = True
+            
+            for r in results:
+                boxes = r.boxes
+                for box in boxes:
                     conf = float(box.conf[0])
-                    highest_conf = max(highest_conf, conf)
-                    human_detected = True
-                    
                     xyxy = box.xyxy[0].tolist()
                     x1, y1, x2, y2 = map(int, xyxy)
-                    w_box = x2 - x1
-                    h_box = y2 - y1
+                    w_box = max(1, x2 - x1)
+                    h_box = max(1, y2 - y1)
+                    
+                    highest_conf = max(highest_conf, conf)
+                    human_detected = True
                     boxes_info.append({"x": x1, "y": y1, "w": w_box, "h": h_box, "confidence": conf})
                     
-                    bgr_color = (12, 185, 16) if conf > 0.6 else (36, 191, 251)
-                    cv2.rectangle(img, (x1, y1), (x2, y2), bgr_color, 2)
-                    cv2.putText(img, f"HUMAN: {conf*100:.1f}%", (x1, y1 - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.5, bgr_color, 2)
-    except Exception as e:
-        print(f"[Server] YOLOv8 inference failed: {e}")
-        
+                    color = (16, 185, 129) if conf > 0.60 else (251, 191, 36)
+                    label = f"HUMAN: {conf * 100:.1f}%"
+                    draw_hud_box(img, x1, y1, x2, y2, label, color)
+        except Exception as e:
+            print(f"[Server] YOLOv8 inference warning: {e}")
+            yolo_success = False
+
+    # Fallback to OpenCV HOG / Haar Cascade if YOLO failed or unavailable
+    if not yolo_success or (not human_detected and model is None):
+        hog, cascade = get_opencv_fallback()
+        if hog is not None:
+            try:
+                h_orig, w_orig = img.shape[:2]
+                scale = 400.0 / max(1, w_orig)
+                resized = cv2.resize(img, (int(w_orig * scale), int(h_orig * scale)))
+                (rects, weights) = hog.detectMultiScale(resized, winStride=(4, 4), padding=(8, 8), scale=1.05)
+                
+                for (x, y, w_b, h_b), weight in zip(rects, weights):
+                    x1 = int(x / scale)
+                    y1 = int(y / scale)
+                    x2 = int((x + w_b) / scale)
+                    y2 = int((y + h_b) / scale)
+                    conf = float(min(0.95, max(0.40, weight * 0.4)))
+                    highest_conf = max(highest_conf, conf)
+                    human_detected = True
+                    boxes_info.append({"x": x1, "y": y1, "w": x2 - x1, "h": y2 - y1, "confidence": conf})
+                    draw_hud_box(img, x1, y1, x2, y2, f"PERSON: {conf*100:.0f}%", (0, 242, 254))
+            except Exception as e:
+                print(f"[Server] OpenCV HOG detect failed: {e}")
+
+    # Top HUD Status Tag
+    hud_text = f"YOLO AI: {'HUMAN DETECTED' if human_detected else 'SCANNING — CLEAR'} ({len(boxes_info)} targets)"
+    hud_color = (16, 185, 129) if human_detected else (0, 242, 254)
+    cv2.putText(img, hud_text, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (10, 15, 25), 3, cv2.LINE_AA)
+    cv2.putText(img, hud_text, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, hud_color, 1, cv2.LINE_AA)
+    
     return img, human_detected, highest_conf, boxes_info
 
 @app.route('/api/camera/stream_yolo')
 def stream_yolo():
     """
-    Proxies ESP32-CAM MJPEG stream, runs YOLOv8 human detection on every frame,
-    and returns a live annotated MJPEG stream. Falls back to synthetic demo feed if camera is offline.
+    Proxies ESP32-CAM MJPEG stream or PC Webcam (url=webcam/0), runs YOLOv8 human detection
+    on every frame, and returns a live annotated MJPEG stream. Falls back to demo if offline.
     """
-    target_url = request.args.get('url')
+    target_url = (request.args.get('url') or '').strip()
     
     def generate_frames():
+        global latest_camera_result
         def generate_demo():
             last_switch = time.time()
             show_human = False
@@ -295,50 +373,121 @@ def stream_yolo():
                     last_switch = time.time()
                     
                 if show_human:
-                    cv2.rectangle(frame, (280, 180), (360, 340), (16, 185, 129), 2)
-                    cv2.putText(frame, "HUMAN: 94.7%", (280, 172), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (16, 185, 129), 2)
+                    draw_hud_box(frame, 270, 150, 370, 350, "HUMAN: 94.7%", (16, 185, 129))
                     dot_size = int(5 + 3 * math.sin(frame_idx * 0.2))
-                    cv2.circle(frame, (320, 260), dot_size, (16, 185, 129), -1)
-                    cv2.putText(frame, "Vitals Active", (330, 263), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (16, 185, 129), 1)
+                    cv2.circle(frame, (320, 250), dot_size, (16, 185, 129), -1)
                 
-                cv2.putText(frame, "AI DETECTOR DEMO (NO LIVE CAM)", (170, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (254, 242, 0), 1)
+                cv2.putText(frame, "AI DETECTOR DEMO (CONNECT CAM TO STREAM)", (130, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (254, 242, 0), 1, cv2.LINE_AA)
                 
                 frame_idx += 1
-                _, buffer = cv2.imencode('.jpg', frame)
+                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
         
+        # 1. Handle Local PC Webcam
+        if target_url.lower() in ('webcam', '0', 'camera', 'local', 'local_cam'):
+            cap = None
+            try:
+                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                if not cap.isOpened():
+                    cap = cv2.VideoCapture(0)
+                
+                if not cap.isOpened():
+                    print("[Server] Local webcam could not be opened.")
+                    yield from generate_demo()
+                    return
+                
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                
+                while True:
+                    ret, frame = cap.read()
+                    if not ret or frame is None:
+                        time.sleep(0.05)
+                        continue
+                    
+                    frame, detected, conf, boxes = detect_humans(frame)
+                    
+                    latest_camera_result = {
+                        "human_detected": detected,
+                        "confidence": float(conf),
+                        "box_count": len(boxes),
+                        "last_update": time.time(),
+                        "source": "webcam"
+                    }
+                    
+                    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            except Exception as e:
+                print(f"[Server] Webcam stream error: {e}")
+                yield from generate_demo()
+            finally:
+                if cap is not None and cap.isOpened():
+                    cap.release()
+            return
+
         if not target_url:
             yield from generate_demo()
             return
 
+        # 2. Handle ESP32-CAM / IP Camera MJPEG stream
         clean_url = target_url.strip()
         if not clean_url.startswith(('http://', 'https://')):
             clean_url = 'http://' + clean_url
             
         try:
-            stream = requests.get(clean_url, stream=True, timeout=5)
+            stream = requests.get(clean_url, stream=True, timeout=6)
             if stream.status_code != 200:
+                print(f"[Server] Camera URL returned status code: {stream.status_code}")
                 yield from generate_demo()
                 return
                 
             byte_data = b''
+            
             for chunk in stream.iter_content(chunk_size=4096):
                 byte_data += chunk
+                
+                # Check for JPEG Start of Image (SOI) marker \xff\xd8
                 a = byte_data.find(b'\xff\xd8')
-                b = byte_data.find(b'\xff\xd9')
-                if a != -1 and b != -1:
-                    jpg = byte_data[a:b+2]
-                    byte_data = byte_data[b+2:]
+                if a != -1:
+                    # Look for JPEG End of Image (EOI) marker \xff\xd9 AFTER the SOI marker
+                    b = byte_data.find(b'\xff\xd9', a + 2)
+                    if b != -1:
+                        # Extract the complete JPEG image
+                        jpg = byte_data[a:b+2]
+                        byte_data = byte_data[b+2:]
+                        
+                        # Frame-skipping: if buffer accumulated backlogged frames during inference,
+                        # jump to the most recent frame to ensure zero lag
+                        if len(byte_data) > 16384:
+                            last_a = byte_data.rfind(b'\xff\xd8')
+                            if last_a > 0:
+                                last_b = byte_data.find(b'\xff\xd9', last_a + 2)
+                                if last_b != -1:
+                                    jpg = byte_data[last_a:last_b+2]
+                                    byte_data = byte_data[last_b+2:]
+                        
+                        np_arr = np.frombuffer(jpg, dtype=np.uint8)
+                        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                        
+                        if frame is not None:
+                            frame, detected, conf, boxes = detect_humans(frame)
+                            
+                            latest_camera_result = {
+                                "human_detected": detected,
+                                "confidence": float(conf),
+                                "box_count": len(boxes),
+                                "last_update": time.time(),
+                                "source": "esp32_cam"
+                            }
+                            
+                            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                            yield (b'--frame\r\n'
+                                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                elif len(byte_data) > 32768:
+                    byte_data = byte_data[-4096:]
                     
-                    np_arr = np.frombuffer(jpg, dtype=np.uint8)
-                    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-                    
-                    if frame is not None:
-                        frame, detected, conf, boxes = detect_humans(frame)
-                        _, buffer = cv2.imencode('.jpg', frame)
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
         except Exception as e:
             print(f"[Server] Stream proxy error: {e}")
             yield from generate_demo()
@@ -348,12 +497,13 @@ def stream_yolo():
 @app.route('/api/camera/analyze_snapshot', methods=['GET', 'POST', 'OPTIONS'])
 def analyze_snapshot():
     """
-    Runs human detection on a snapshot frame from the ESP32-CAM.
+    Runs human detection on a single snapshot frame from the ESP32-CAM or PC Webcam.
     """
+    global latest_camera_result
     if request.method == 'OPTIONS':
         return jsonify({"status": "ok"}), 200
 
-    target_url = request.args.get('url')
+    target_url = (request.args.get('url') or '').strip()
     is_demo = request.args.get('demo', 'false').lower() == 'true' or not target_url
     
     try:
@@ -364,10 +514,8 @@ def analyze_snapshot():
             cv2.line(frame, (320, 40), (320, 440), (40, 40, 0), 1)
             cv2.line(frame, (120, 240), (520, 240), (40, 40, 0), 1)
             
-            cv2.rectangle(frame, (280, 180), (360, 340), (16, 185, 129), 2)
-            cv2.putText(frame, "HUMAN: 95.8%", (280, 172), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (16, 185, 129), 2)
-            cv2.circle(frame, (320, 260), 6, (16, 185, 129), -1)
-            cv2.putText(frame, "AI DETECTOR SNAPSHOT (DEMO)", (180, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (254, 242, 0), 1)
+            draw_hud_box(frame, 270, 150, 370, 350, "HUMAN: 95.8%", (16, 185, 129))
+            cv2.putText(frame, "AI DETECTOR SNAPSHOT (DEMO)", (170, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (254, 242, 0), 1, cv2.LINE_AA)
             
             _, buffer = cv2.imencode('.jpg', frame)
             b64_str = base64.b64encode(buffer).decode('utf-8')
@@ -377,25 +525,46 @@ def analyze_snapshot():
                 "human_detected": True,
                 "confidence_pct": 95.8,
                 "box_count": 1,
-                "boxes": [{"x": 280, "y": 180, "w": 80, "h": 160, "confidence": 0.958}],
+                "boxes": [{"x": 270, "y": 150, "w": 100, "h": 200, "confidence": 0.958}],
                 "image": f"data:image/jpeg;base64,{b64_str}"
             }), 200
             
-        clean_url = target_url.strip()
-        if not clean_url.startswith(('http://', 'https://')):
-            clean_url = 'http://' + clean_url
+        # Check if local webcam requested
+        if target_url.lower() in ('webcam', '0', 'camera', 'local'):
+            cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            if not cap.isOpened():
+                cap = cv2.VideoCapture(0)
+            if not cap.isOpened():
+                return jsonify({"status": "error", "message": "Failed to access local webcam"}), 500
+            ret, frame = cap.read()
+            cap.release()
+            if not ret or frame is None:
+                return jsonify({"status": "error", "message": "Failed to read frame from webcam"}), 500
+        else:
+            clean_url = target_url
+            if not clean_url.startswith(('http://', 'https://')):
+                clean_url = 'http://' + clean_url
+                
+            resp = requests.get(clean_url, timeout=5)
+            if resp.status_code != 200:
+                return jsonify({"status": "error", "message": "Failed to retrieve frame from camera"}), 502
+                
+            np_arr = np.frombuffer(resp.content, dtype=np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
-        resp = requests.get(clean_url, timeout=5)
-        if resp.status_code != 200:
-            return jsonify({"status": "error", "message": "Failed to retrieve frame from camera"}), 502
-            
-        np_arr = np.frombuffer(resp.content, dtype=np.uint8)
-        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        
-        if frame is None:
-            return jsonify({"status": "error", "message": "Failed to decode camera frame"}), 500
+            if frame is None:
+                return jsonify({"status": "error", "message": "Failed to decode camera frame"}), 500
             
         frame, detected, conf, boxes = detect_humans(frame)
+        
+        # Update shared camera cache for ML fusion
+        latest_camera_result = {
+            "human_detected": detected,
+            "confidence": float(conf),
+            "box_count": len(boxes),
+            "last_update": time.time(),
+            "source": "snapshot"
+        }
         
         _, buffer = cv2.imencode('.jpg', frame)
         b64_str = base64.b64encode(buffer).decode('utf-8')
@@ -508,6 +677,147 @@ def predict_subsurface():
             "status": "error",
             "message": str(e)
         }), 400
+
+
+@app.route('/api/camera/latest_detection', methods=['GET', 'OPTIONS'])
+def get_latest_camera_detection():
+    """Returns the most recent camera YOLO detection result for the frontend to query."""
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+    age_s = time.time() - latest_camera_result.get('last_update', 0)
+    return jsonify({
+        "status": "success",
+        "human_detected": latest_camera_result['human_detected'],
+        "confidence_pct": round(latest_camera_result['confidence'] * 100, 1),
+        "box_count": latest_camera_result['box_count'],
+        "age_seconds": round(age_s, 1),
+        "source": latest_camera_result['source'],
+        "fresh": age_s < 30.0
+    }), 200
+
+
+@app.route('/api/predict_fused', methods=['POST', 'OPTIONS'])
+def predict_fused():
+    """
+    Sensor-fusion prediction endpoint.
+    Combines the 6-model ML subsurface ensemble (weight: 0.70) with the latest
+    YOLOv8 camera visual detection (weight: 0.30) to produce a fused probability.
+
+    Accepts same body as /api/predict plus optional fields:
+      camera_confidence   : float  0.0 – 1.0  (override; uses cached value if absent)
+      camera_human_detected : bool  (override; uses cached value if absent)
+      camera_max_age_s    : int    max seconds since last camera reading to accept (default 30)
+
+    Returns /api/predict result fields plus:
+      fusion_applied        : bool
+      camera_confidence_pct : float
+      camera_human_detected : bool
+      fused_probability_pct : float
+      fused_human_detected  : bool
+      fused_human_count     : int
+    """
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    ML_WEIGHT     = 0.70
+    CAMERA_WEIGHT = 0.30
+    THRESHOLD     = 50.0  # fused probability threshold to declare human detected
+
+    try:
+        data = request.get_json(force=True) or {}
+        max_age_s = float(data.get('camera_max_age_s', 30.0))
+
+        # ── Determine camera signal ───────────────────────────────────────────
+        cam_age = time.time() - latest_camera_result.get('last_update', 0)
+        cam_fresh = cam_age < max_age_s and latest_camera_result['source'] != 'none'
+
+        # Allow body override (e.g. snapshot result just taken by frontend)
+        if 'camera_confidence' in data:
+            cam_conf  = float(data['camera_confidence'])          # 0.0–1.0
+            cam_human = bool(data.get('camera_human_detected', cam_conf >= 0.50))
+            cam_fresh = True
+        else:
+            cam_conf  = latest_camera_result['confidence'] if cam_fresh else 0.0
+            cam_human = latest_camera_result['human_detected'] if cam_fresh else False
+
+        fusion_applied = cam_fresh
+
+        # ── Process targets (batch or single) ────────────────────────────────
+        def process_fused_target(target_data, cam_conf_override=cam_conf, cam_human_override=cam_human):
+            breathing_hz  = round(float(target_data.get('breathing_hz', 0.0)), 2)
+            heartbeat_hz  = round(float(target_data.get('heartbeat_hz', 0.0)), 2)
+            pir_motion    = float(target_data.get('pir_motion', 1 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+            radar_state   = float(target_data.get('radar_state', 2 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0))
+            radar_energy  = round(float(target_data.get('radar_energy', 75.0 if (breathing_hz > 0.08 or heartbeat_hz > 0.4) else 0.0)), 1)
+            micro_amp     = round(float(target_data.get('micro_amp', 0.0)), 2)
+            snr_db        = round(float(target_data.get('snr_db', 0.0)), 2)
+            bme_temp_c    = round(float(target_data.get('bme_temp_c', target_data.get('temperature_c', 25.0))), 1)
+            bme_humidity  = round(float(target_data.get('bme_humidity_pct', target_data.get('soil_moisture', 35.0))), 1)
+            bme_pressure  = round(float(target_data.get('bme_pressure_hpa', target_data.get('pressure_hpa', 1013.25))), 1)
+            dielectric    = round(float(target_data.get('dielectric_shift', 0.0)), 2)
+            soil_density  = round(float(target_data.get('soil_density', 1600.0)), 0)
+            refl_depth    = round(float(target_data.get('reflection_depth', 1.5)), 2)
+            grid_x        = round(float(target_data.get('x', target_data.get('grid_x', 12.5))), 1)
+            grid_y        = round(float(target_data.get('y', target_data.get('grid_y', 8.2))), 1)
+
+            ml_result = cached_predict(
+                breathing_hz, heartbeat_hz, pir_motion, radar_state, radar_energy,
+                micro_amp, snr_db, bme_temp_c, bme_humidity, bme_pressure,
+                dielectric, soil_density, refl_depth, grid_x, grid_y
+            )
+
+            ml_prob = float(ml_result.get('probability_percentage', 0.0))
+
+            # Weighted fusion
+            if fusion_applied:
+                # Camera seeing a person above ground raises the fused score;
+                # camera clear lowers it (pushes false positives down).
+                cam_score_norm = cam_conf_override if cam_human_override else (1.0 - cam_conf_override) * 0.1
+                fused_prob = (ml_prob * ML_WEIGHT) + (cam_score_norm * 100.0 * CAMERA_WEIGHT)
+                fused_prob = round(min(99.8, max(0.2, fused_prob)), 1)
+            else:
+                fused_prob = ml_prob
+
+            fused_human = fused_prob >= THRESHOLD
+
+            result = dict(ml_result)
+            result['fusion_applied']          = fusion_applied
+            result['camera_confidence_pct']   = round(cam_conf_override * 100, 1)
+            result['camera_human_detected']   = cam_human_override
+            result['fused_probability_pct']   = fused_prob
+            result['fused_human_detected']    = fused_human
+            result['probability_percentage']  = fused_prob   # override for UI consistency
+            result['human_detected']          = fused_human
+            return result
+
+        if 'targets' in data:
+            results = list(executor.map(process_fused_target, data['targets']))
+            human_count      = sum(1 for r in results if r.get('fused_human_detected') is True)
+            fused_human_count = human_count
+            return jsonify({
+                "status": "success",
+                "results": results,
+                "human_count": human_count,
+                "fused_human_count": fused_human_count,
+                "total_targets": len(results),
+                "fusion_applied": fusion_applied,
+                "camera_confidence_pct": round(cam_conf * 100, 1),
+                "camera_human_detected": cam_human
+            })
+
+        # Single target
+        fused_result = process_fused_target(data)
+        return jsonify({
+            "status": "success",
+            "result": fused_result,
+            "fusion_applied": fusion_applied,
+            "camera_confidence_pct": round(cam_conf * 100, 1),
+            "camera_human_detected": cam_human
+        })
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+
 
 @app.route('/api/streampetr', methods=['POST', 'OPTIONS'])
 def streampetr_analyze():

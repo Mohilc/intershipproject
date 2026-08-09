@@ -54,7 +54,7 @@ const int ap_max_connections = 4;             // Max simultaneous clients
 #define I2C_SCL 22
 
 // --- Sensor Objects ---
-BME690_7semi bme;
+BME690_7semi bme(0x76); // Default I2C address (ADDR/SDO pin LOW). Try 0x77 if sensor is not detected.
 bool bmeAvailable = false;
 
 // --- Web Server on port 80 ---
