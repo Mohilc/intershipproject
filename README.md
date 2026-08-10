@@ -284,6 +284,13 @@ DEBUG=False
 
 ### 3. Flash & Boot the Hardware (ESP32 + ESP32-CAM)
 
+> [!WARNING]
+> **CRITICAL OPERATIONAL PROCEDURES — FOLLOW TO GET CORRECT OUTPUT:**
+>
+> 1. **AP Boot Sequence Order**: You **must** power on the primary Sensor ESP32 **first**. It creates the `TERRA-SENSE-ESP32` WiFi AP. If you boot the ESP32-CAM before the host AP is ready, it will fail to connect and enter a reboot loop.
+> 2. **Brownout Prevention**: The ESP32-CAM draws up to 500mA in bursts during camera initialization and WiFi handshake. Power it using a clean, external 5V line. Weak power sources will trigger the internal brownout detector, causing the camera board to constantly reset.
+> 3. **Windows Interface Priority Warning**: If your PC is connected to both the Wi-Fi hotspot and an Ethernet cable (with Internet), Windows may route local `192.168.4.x` requests through the Ethernet port. If you see "Stream Offline" or telemetry fails, **unplug your Ethernet cable** or disable other active adapters to force Windows to route traffic over the Wi-Fi card.
+
 #### Boot Order (important!):
 1. **Flash & power on the Sensor ESP32 first** — it creates the WiFi hotspot `TERRA-SENSE-ESP32`
 2. **Bridge IO0 to 3V3 on the ESP32-CAM** to force Run Mode at startup on external power
