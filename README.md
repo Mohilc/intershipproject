@@ -69,48 +69,55 @@ To optimize low-latency tactical performance and network reliability in real-wor
 
 ```mermaid
 flowchart TD
-    subgraph S1["Stage 1: Edge Data Acquisition"]
-        A1["Sensor ESP32 (192.168.4.1)<br>• 24GHz Doppler Radar<br>• BME690 Environmental<br>• PIR Motion Detector"]
-        A2["ESP32-CAM Node (192.168.4.2)<br>• OV2640 Video Stream (/stream)<br>• Onboard Flash LED (/led)<br>• Single Frame Capture (/capture)"]
-        A3["PC Webcam / USB Camera<br>• Local DirectShow video capture"]
-        A4["CSV Batch Field Survey<br>• Multi-point GPR scan logs"]
+    %% Custom Styles Definition
+    classDef stage1 fill:#0f172a,stroke:#00f2fe,stroke-width:2px,color:#e2e8f0;
+    classDef stage2 fill:#1e1b4b,stroke:#f59e0b,stroke-width:2px,color:#e2e8f0;
+    classDef stage3 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#e2e8f0;
+    classDef stage4 fill:#311042,stroke:#a855f7,stroke-width:2px,color:#e2e8f0;
+
+    subgraph SG1 ["📡 STAGE 1: EDGE SENSORS & DATA INPUTS"]
+        A1["📡 ESP32 Sensor AP Node<br>(192.168.4.1)<br>• 24GHz Doppler Radar Sensor<br>• BME690 Environmental Gas Sensor<br>• PIR Motion Detector HC-SR501"]:::stage1
+        A2["📷 ESP32-CAM Client Node<br>(192.168.4.2)<br>• OV2640 Live Stream (/stream)<br>• Onboard Flash LED Spotlight (/led)"]:::stage1
+        A3["💻 PC Local USB Webcam<br>• cv2.VideoCapture(0) Feed<br>• Local DirectShow failover"]:::stage1
+        A4[("📂 Field Survey CSV Scan<br>• GPR Soil Permittivity readings<br>• Multi-row scan logging")]:::stage1
     end
 
-    subgraph S2["Stage 2: Processing & Proxy Gateway (server.py)"]
-        B1["Hotspot Mesh Network<br>SSID: TERRA-SENSE-ESP32 (192.168.4.x)"]
-        B2["Flask REST API Server (Port 3000)<br>• CORS Proxy Tunneling<br>• 12-Channel Normalizer<br>• LRU Prediction Caching"]
-        B3["Zero-Latency MJPEG Stream Engine<br>• Dynamic Frame Slicing<br>• Auto Frame-Skipping Buffer"]
+    subgraph SG2 ["⚡ STAGE 2: PROCESSING & PROXY GATEWAY"]
+        B1(["🌐 Hotspot Mesh Network<br>SSID: TERRA-SENSE-ESP32<br>• Local station IP leasing"]):::stage2
+        B2{{"⚙️ Flask REST Core Server<br>(Port 3000 / server.py)<br>• CORS Proxy Tunneling Gateway<br>• 12-Channel Input Normalization<br>• LRU Prediction Caching"}}:::stage2
+        B3(["🎥 Zero-Lag MJPEG Stream Engine<br>• Async YOLO worker queue<br>• Auto Frame-Skipping Buffer"]):::stage2
     end
 
-    subgraph S3["Stage 3: Multi-Modal AI Decision Engines"]
-        C1["6-Model ML Consensus Ensemble (ml_model.py)<br>• Gradient Boosting (28%) • Random Forest (22%)<br>• Extra Trees (20%) • AdaBoost (12%)<br>• MLP Neural Net (10%) • KNN (8%)<br>➔ 100% Subsurface Precision"]
-        C2["YOLOv8 & OpenCV Human Detector<br>• Real-time Person Detection (classes=[0])<br>• Neon HUD Bounding Boxes & Reticles<br>• OpenCV HOG / Haar Cascade Fallback"]
-        C3["Vision-Sensor Fusion Engine (/api/predict_fused)<br>• 70% Subsurface Bio Ensemble<br>• 30% Optical YOLO Visual Confidence"]
-        C4["NVIDIA StreamPETR 3D Spatial Localizer<br>• 3D Posture Estimation (Supine/Prone/Fetal)<br>• Void Entrapment & Obstacle Proximity<br>• Tactical Drill-Entry Vectors"]
+    subgraph SG3 ["🧠 STAGE 3: MULTI-MODAL AI COGNITION"]
+        C1("🧠 6-Model ML Ensemble<br>(ml_model.py)<br>• Soft-voting Consensus<br>• 100% Subsurface Precision"):::stage3
+        C2("👁️ YOLOv8 & OpenCV Human Vision<br>• person tracking class[0]<br>• Async background inference<br>• OpenCV HOG fallback"):::stage3
+        C3("🛰️ Vision-Sensor Fusion Engine<br>• 70% Subsurface Radar Classifier<br>• 30% Optical Vision Confidence"):::stage3
+        C4("📐 NVIDIA StreamPETR 3D<br>• Victim 3D Posture Estimation<br>• Drill entry angle vectors"):::stage3
     end
 
-    subgraph S4["Stage 4: Tactical Command Dashboard (WebGL)"]
-        D1["Three.js 3D Subsurface Visualizer<br>• Orbiting SAR Drone & Spotlight Beam<br>• Multi-Strata Soil Layers (0m to 5m)<br>• Pulsing Bio-Spheres & Sub-cm GPS Sprites"]
-        D2["Real-Time Optical Vision HUD<br>• Live Video with Bounding Box Annotations<br>• Target Acquisition Audio Alerts<br>• Remote Flashlight Switch"]
-        D3["Bio-Diagnostics & Tactical Metrics<br>• Respiration & Cardiac Pulse Graphs<br>• Earth-Curvature Cosine GPS Resolver<br>• Remaining Oxygen Survival Timer"]
-        D4["Mission Action Output<br>• Printable PDF Disaster Report<br>• Machine-readable JSON Export"]
+    subgraph SG4 ["🛸 STAGE 4: TACTICAL COMMAND DASHBOARD"]
+        D1["🛸 Three.js 3D WebGL Matrix<br>• Orbiting drone & spot beam<br>• Sub-cm Target GPS Sprites"]:::stage4
+        D2["🛡️ Real-Time Optical HUD<br>• Live feed & Reticle box<br>• Target acquire audio buzzer"]:::stage4
+        D3["📊 Bio-Diagnostics & Metrics<br>• Pulse Oscilloscope graph<br>• Oxygen survival timer"]:::stage4
+        D4[("📋 Mission Report Exporter<br>• Tactical Action JSON Logs<br>• Printable Rescue PDF Report")]:::stage4
     end
 
-    A1 -->|Wi-Fi HTTP GET /api/telemetry| B1
-    A2 -->|MJPEG /stream & /capture| B1
-    A3 -->|cv2.VideoCapture| B2
-    A4 -->|Multipart Upload| B2
-    B1 --> B2
-    B2 --> B3
-    B2 --> C1
-    B3 --> C2
-    C1 --> C3
-    C2 --> C3
-    C1 --> C4
-    C3 --> D1
-    C2 --> D2
-    C4 --> D3
-    D1 & D2 & D3 --> D4
+    %% Flow Connections with Styling
+    A1 ==>|WiFi HTTP GET /api/telemetry| B1
+    A2 ==>|MJPEG video stream| B1
+    A3 -->|Webcam raw frame buffer| B2
+    A4 -->|Multipart file upload| B2
+    B1 ==>|Routing interface| B2
+    B2 ==>|Push frames to worker| B3
+    B3 ==>|Async queue frames| C2
+    B2 -->|Input sensor vectors| C1
+    C1 -->|Radar bio prediction| C3
+    C2 -->|YOLO target conf| C3
+    C1 -->|Spatial anomaly coords| C4
+    C3 ==>|Fused target vector| D1
+    C2 ==>|Annotated frame stream| D2
+    C4 ==>|Entrapment metrics| D3
+    D1 & D2 & D3 ==>|Export action logs| D4
 ```
 
 ---
