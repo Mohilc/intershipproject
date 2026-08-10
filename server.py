@@ -90,8 +90,10 @@ def add_headers(response):
     elif request.path == '/':
         response.headers['Cache-Control'] = 'public, max-age=300'  # 5 min for index
 
-    # Gzip compression for text responses
-    if (response.content_type and
+    # Gzip compression for text/json responses when supported by client
+    accept_enc = request.headers.get('Accept-Encoding', '')
+    if ('gzip' in accept_enc and
+        response.content_type and
         any(ct in response.content_type for ct in ['text/', 'application/json', 'application/javascript']) and
         'Content-Encoding' not in response.headers and
         not response.direct_passthrough and
@@ -199,9 +201,77 @@ def camera_proxy():
         return jsonify({"status": "error", "message": f"Camera node offline or unreachable: {str(e)}"}), 502
 
 # --- YOLOv8 / OpenCV Human Detection Integration ---
+import queue
+import threading
+
 _yolo_model = None
 _hog_detector = None
 _face_cascade = None
+
+class YOLOBackgroundWorker:
+    def __init__(self):
+        self.frame_queue = queue.Queue(maxsize=1)
+        self.latest_boxes = []
+        self.latest_detected = False
+        self.latest_conf = 0.0
+        self.lock = threading.Lock()
+        self.thread = None
+        self.running = False
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.thread = threading.Thread(target=self._worker_loop, daemon=True)
+            self.thread.start()
+
+    def stop(self):
+        self.running = False
+        try:
+            self.frame_queue.put_nowait(None)
+        except Exception:
+            pass
+        if self.thread is not None:
+            try:
+                self.thread.join(timeout=1.0)
+            except Exception:
+                pass
+
+    def _worker_loop(self):
+        while self.running:
+            try:
+                frame = self.frame_queue.get(timeout=1.0)
+                if frame is None or not self.running:
+                    continue
+                
+                # Run YOLO/OpenCV raw detection
+                detected, conf, boxes = detect_humans_raw(frame)
+                
+                with self.lock:
+                    self.latest_detected = detected
+                    self.latest_conf = conf
+                    self.latest_boxes = boxes
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[YOLO Worker] Error: {e}")
+
+    def update_frame(self, frame):
+        if not self.running or frame is None:
+            return
+        # Keep queue size at most 1 to avoid latency lag
+        try:
+            if self.frame_queue.full():
+                try:
+                    self.frame_queue.get_nowait()
+                except queue.Empty:
+                    pass
+            self.frame_queue.put_nowait(frame.copy())
+        except Exception:
+            pass
+
+    def get_results(self):
+        with self.lock:
+            return self.latest_detected, self.latest_conf, self.latest_boxes
 
 def get_yolo_model():
     global _yolo_model
@@ -269,13 +339,13 @@ def draw_hud_box(img, x1, y1, x2, y2, label, color=(16, 185, 129)):
     cv2.rectangle(img, (x1, tag_y - text_h - 6), (x1 + text_w + 10, tag_y + 4), color, 1)
     cv2.putText(img, label, (x1 + 5, tag_y - 2), font, font_scale, (255, 255, 255), thickness, cv2.LINE_AA)
 
-def detect_humans(img):
+def detect_humans_raw(img):
     """
     Runs YOLOv8 human detection (or OpenCV fallback) on a frame.
-    Returns: (processed_img, human_detected, highest_confidence, boxes)
+    Returns: (human_detected, highest_confidence, boxes_info)
     """
     if img is None:
-        return img, False, 0.0, []
+        return False, 0.0, []
 
     human_detected = False
     highest_conf = 0.0
@@ -302,10 +372,6 @@ def detect_humans(img):
                     highest_conf = max(highest_conf, conf)
                     human_detected = True
                     boxes_info.append({"x": x1, "y": y1, "w": w_box, "h": h_box, "confidence": conf})
-                    
-                    color = (16, 185, 129) if conf > 0.60 else (251, 191, 36)
-                    label = f"HUMAN: {conf * 100:.1f}%"
-                    draw_hud_box(img, x1, y1, x2, y2, label, color)
         except Exception as e:
             print(f"[Server] YOLOv8 inference warning: {e}")
             yolo_success = False
@@ -329,151 +395,403 @@ def detect_humans(img):
                     highest_conf = max(highest_conf, conf)
                     human_detected = True
                     boxes_info.append({"x": x1, "y": y1, "w": x2 - x1, "h": y2 - y1, "confidence": conf})
-                    draw_hud_box(img, x1, y1, x2, y2, f"PERSON: {conf*100:.0f}%", (0, 242, 254))
             except Exception as e:
                 print(f"[Server] OpenCV HOG detect failed: {e}")
 
+    return human_detected, highest_conf, boxes_info
+
+def draw_detection_hud(img, human_detected, highest_conf, boxes_info):
+    """Draws boxes and the HUD status text on the frame."""
+    if img is None:
+        return img
+    for box in boxes_info:
+        x1, y1 = box["x"], box["y"]
+        x2, y2 = x1 + box["w"], y1 + box["h"]
+        conf = box["confidence"]
+        
+        color = (16, 185, 129) if conf > 0.60 else (251, 191, 36)
+        label = f"HUMAN: {conf * 100:.1f}%"
+        draw_hud_box(img, x1, y1, x2, y2, label, color)
+        
     # Top HUD Status Tag
     hud_text = f"YOLO AI: {'HUMAN DETECTED' if human_detected else 'SCANNING — CLEAR'} ({len(boxes_info)} targets)"
     hud_color = (16, 185, 129) if human_detected else (0, 242, 254)
     cv2.putText(img, hud_text, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (10, 15, 25), 3, cv2.LINE_AA)
     cv2.putText(img, hud_text, (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, hud_color, 1, cv2.LINE_AA)
-    
-    return img, human_detected, highest_conf, boxes_info
+    return img
 
+def detect_humans(img):
+    """Backward compatibility wrapper that does both detection and drawing."""
+    detected, conf, boxes = detect_humans_raw(img)
+    img = draw_detection_hud(img, detected, conf, boxes)
+    return img, detected, conf, boxes
+
+def create_diagnostic_frame(title, subtitle="", details=None, frame_idx=0):
+    """Generates an informative HUD diagnostic frame when camera connection is lost or offline."""
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    
+    # Outer HUD grid and border
+    cv2.rectangle(frame, (10, 10), (630, 470), (0, 242, 254), 1)
+    cv2.rectangle(frame, (14, 14), (626, 466), (20, 30, 45), -1)
+    
+    # Corner brackets
+    for (cx, cy, dx, dy) in [(20, 20, 20, 20), (620, 20, -20, 20), (20, 460, 20, -20), (620, 460, -20, -20)]:
+        cv2.line(frame, (cx, cy), (cx + dx, cy), (0, 242, 254), 2)
+        cv2.line(frame, (cx, cy), (cx, cy + dy), (0, 242, 254), 2)
+
+    # Animated radar pulse dot
+    pulse_radius = int(8 + 4 * math.sin(frame_idx * 0.2))
+    cv2.circle(frame, (50, 50), pulse_radius, (244, 63, 94), -1)
+    cv2.circle(frame, (50, 50), pulse_radius + 6, (244, 63, 94), 1)
+
+    # Title & Subtitle
+    cv2.putText(frame, title, (80, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
+    if subtitle:
+        cv2.putText(frame, subtitle, (80, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 242, 254), 1, cv2.LINE_AA)
+        
+    cv2.line(frame, (30, 100), (610, 100), (0, 242, 254), 1)
+
+    # Checklist / Instructions
+    y_offset = 140
+    if details:
+        for idx, line in enumerate(details):
+            color = (16, 185, 129) if line.startswith("✓") else (251, 191, 36) if line.startswith("⚠") else (200, 220, 240)
+            cv2.putText(frame, line, (40, y_offset + idx * 32), cv2.FONT_HERSHEY_SIMPLEX, 0.46, color, 1, cv2.LINE_AA)
+
+    # Footer status
+    status_bar = f"STATUS: RETRYING CONNECTION... [FRAME {frame_idx}]"
+    cv2.putText(frame, status_bar, (40, 440), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (150, 160, 180), 1, cv2.LINE_AA)
+    
+    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+    return buffer.tobytes()
 @app.route('/api/camera/stream_yolo')
 def stream_yolo():
     """
     Proxies ESP32-CAM MJPEG stream or PC Webcam (url=webcam/0), runs YOLOv8 human detection
-    on every frame, and returns a live annotated MJPEG stream. Falls back to demo if offline.
+    on every frame, and returns a live annotated MJPEG stream.
+    Supports auto-probing common ESP32 / IP camera endpoints (/stream, :81/stream, /video, /capture).
     """
     target_url = (request.args.get('url') or '').strip()
+    yolo_param = request.args.get('yolo', 'true').lower()
+    enable_yolo = yolo_param not in ('false', '0', 'off', 'no')
+    
+    yolo_worker = None
+    if enable_yolo:
+        yolo_worker = YOLOBackgroundWorker()
+        yolo_worker.start()
     
     def generate_frames():
         global latest_camera_result
-        def generate_demo():
-            last_switch = time.time()
-            show_human = False
-            frame_idx = 0
-            while True:
-                time.sleep(0.06)
-                frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.circle(frame, (320, 240), 180, (40, 40, 0), 1)
-                cv2.circle(frame, (320, 240), 120, (30, 30, 0), 1)
-                cv2.line(frame, (320, 40), (320, 440), (40, 40, 0), 1)
-                cv2.line(frame, (120, 240), (520, 240), (40, 40, 0), 1)
-                
-                angle = (frame_idx * 0.05) % (2 * math.pi)
-                x_sweep = int(320 + 180 * math.cos(angle))
-                y_sweep = int(240 + 180 * math.sin(angle))
-                cv2.line(frame, (320, 240), (x_sweep, y_sweep), (254, 242, 0), 2)
-                
-                if time.time() - last_switch > 6.0:
-                    show_human = not show_human
-                    last_switch = time.time()
-                    
-                if show_human:
-                    draw_hud_box(frame, 270, 150, 370, 350, "HUMAN: 94.7%", (16, 185, 129))
-                    dot_size = int(5 + 3 * math.sin(frame_idx * 0.2))
-                    cv2.circle(frame, (320, 250), dot_size, (16, 185, 129), -1)
-                
-                cv2.putText(frame, "AI DETECTOR DEMO (CONNECT CAM TO STREAM)", (130, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (254, 242, 0), 1, cv2.LINE_AA)
-                
-                frame_idx += 1
-                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
         
-        # 1. Handle Local PC Webcam
-        if target_url.lower() in ('webcam', '0', 'camera', 'local', 'local_cam'):
-            cap = None
-            try:
-                cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-                if not cap.isOpened():
-                    cap = cv2.VideoCapture(0)
-                
-                if not cap.isOpened():
-                    print("[Server] Local webcam could not be opened.")
-                    yield from generate_demo()
-                    return
-                
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                
+        try:
+            def generate_demo():
+                last_switch = time.time()
+                show_human = False
+                frame_idx = 0
                 while True:
-                    ret, frame = cap.read()
-                    if not ret or frame is None:
-                        time.sleep(0.05)
-                        continue
+                    time.sleep(0.06)
+                    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.circle(frame, (320, 240), 180, (40, 40, 0), 1)
+                    cv2.circle(frame, (320, 240), 120, (30, 30, 0), 1)
+                    cv2.line(frame, (320, 40), (320, 440), (40, 40, 0), 1)
+                    cv2.line(frame, (120, 240), (520, 240), (40, 40, 0), 1)
                     
-                    frame, detected, conf, boxes = detect_humans(frame)
+                    angle = (frame_idx * 0.05) % (2 * math.pi)
+                    x_sweep = int(320 + 180 * math.cos(angle))
+                    y_sweep = int(240 + 180 * math.sin(angle))
+                    cv2.line(frame, (320, 240), (x_sweep, y_sweep), (254, 242, 0), 2)
                     
-                    latest_camera_result = {
-                        "human_detected": detected,
-                        "confidence": float(conf),
-                        "box_count": len(boxes),
-                        "last_update": time.time(),
-                        "source": "webcam"
-                    }
+                    if time.time() - last_switch > 6.0:
+                        show_human = not show_human
+                        last_switch = time.time()
+                        
+                    if show_human:
+                        draw_hud_box(frame, 270, 150, 370, 350, "HUMAN: 94.7%", (16, 185, 129))
+                        dot_size = int(5 + 3 * math.sin(frame_idx * 0.2))
+                        cv2.circle(frame, (320, 250), dot_size, (16, 185, 129), -1)
+                        
+                        latest_camera_result = {
+                            "human_detected": True,
+                            "confidence": 0.947,
+                            "box_count": 1,
+                            "last_update": time.time(),
+                            "source": "demo"
+                        }
+                    else:
+                        latest_camera_result = {
+                            "human_detected": False,
+                            "confidence": 0.0,
+                            "box_count": 0,
+                            "last_update": time.time(),
+                            "source": "demo"
+                        }
                     
-                    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                    cv2.putText(frame, "AI DETECTOR DEMO (CONNECT CAM TO STREAM)", (130, 460), cv2.FONT_HERSHEY_SIMPLEX, 0.48, (254, 242, 0), 1, cv2.LINE_AA)
+                    
+                    frame_idx += 1
+                    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            except Exception as e:
-                print(f"[Server] Webcam stream error: {e}")
-                yield from generate_demo()
-            finally:
-                if cap is not None and cap.isOpened():
-                    cap.release()
-            return
-
-        if not target_url:
-            yield from generate_demo()
-            return
-
-        # 2. Handle ESP32-CAM / IP Camera MJPEG stream
-        clean_url = target_url.strip()
-        if not clean_url.startswith(('http://', 'https://')):
-            clean_url = 'http://' + clean_url
             
-        try:
-            stream = requests.get(clean_url, stream=True, timeout=6)
-            if stream.status_code != 200:
-                print(f"[Server] Camera URL returned status code: {stream.status_code}")
+            # 1. Handle Local PC Webcam
+            if target_url.lower() in ('webcam', '0', 'camera', 'local', 'local_cam'):
+                cap = None
+                try:
+                    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                    if not cap.isOpened():
+                        cap = cv2.VideoCapture(0)
+                    
+                    if not cap.isOpened():
+                        print("[Server] Local webcam could not be opened.")
+                        yield from generate_demo()
+                        return
+                    
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                    
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret or frame is None:
+                            time.sleep(0.05)
+                            continue
+                        
+                        if enable_yolo and yolo_worker:
+                            yolo_worker.update_frame(frame)
+                            detected, conf, boxes = yolo_worker.get_results()
+                            frame = draw_detection_hud(frame, detected, conf, boxes)
+                            latest_camera_result = {
+                                "human_detected": detected,
+                                "confidence": float(conf),
+                                "box_count": len(boxes),
+                                "last_update": time.time(),
+                                "source": "webcam"
+                            }
+                        else:
+                            cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                            latest_camera_result = {
+                                "human_detected": False,
+                                "confidence": 0.0,
+                                "box_count": 0,
+                                "last_update": time.time(),
+                                "source": "webcam"
+                            }
+                        
+                        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                except Exception as e:
+                    print(f"[Server] Webcam stream error: {e}")
+                    yield from generate_demo()
+                finally:
+                    if cap is not None and cap.isOpened():
+                        cap.release()
+                return
+
+            if not target_url or target_url.lower() in ('demo', 'synthetic', 'test'):
                 yield from generate_demo()
                 return
-                
-            byte_data = b''
+
+            # 2. Build candidate stream URLs for ESP32-CAM / IP Camera
+            clean_url = target_url.strip()
+            if not clean_url.startswith(('http://', 'https://', 'rtsp://')):
+                clean_url = 'http://' + clean_url
+
+            # Generate candidates to probe
+            candidates = [clean_url]
             
-            for chunk in stream.iter_content(chunk_size=4096):
-                byte_data += chunk
-                
-                # Check for JPEG Start of Image (SOI) marker \xff\xd8
-                a = byte_data.find(b'\xff\xd8')
-                if a != -1:
-                    # Look for JPEG End of Image (EOI) marker \xff\xd9 AFTER the SOI marker
-                    b = byte_data.find(b'\xff\xd9', a + 2)
-                    if b != -1:
-                        # Extract the complete JPEG image
-                        jpg = byte_data[a:b+2]
-                        byte_data = byte_data[b+2:]
+            # If user entered raw IP/host or just port, try common stream paths
+            base_no_slash = clean_url.rstrip('/')
+            if not any(base_no_slash.endswith(p) for p in ['/stream', '/video', '/capture', '/shot.jpg', '/mjpeg', '/live']):
+                candidates.append(base_no_slash + '/stream')
+                # Check port 81 (standard Arduino ESP32 CameraWebServer stream port)
+                if ':81' not in base_no_slash:
+                    if ':80' in base_no_slash:
+                        candidates.append(base_no_slash.replace(':80', ':81') + '/stream')
+                    else:
+                        try:
+                            from urllib.parse import urlparse
+                            parsed = urlparse(base_no_slash)
+                            host_only = parsed.hostname or base_no_slash.replace('http://', '').replace('https://', '').split('/')[0]
+                            candidates.append(f"http://{host_only}:81/stream")
+                        except Exception:
+                            pass
+                candidates.append(base_no_slash + '/video')
+                candidates.append(base_no_slash + '/capture')
+                candidates.append(base_no_slash + '/shot.jpg')
+
+            # Try to connect to candidate stream
+            headers = {
+                'User-Agent': 'TerraSense-AI-Proxy/2.0',
+                'Accept': '*/*'
+            }
+            
+            stream_resp = None
+            active_url = None
+            is_snapshot_endpoint = False
+
+            for cand in candidates:
+                try:
+                    r = requests.get(cand, stream=True, timeout=(2.5, 8.0), headers=headers)
+                    if r.status_code == 200:
+                        c_type = r.headers.get('Content-Type', '').lower()
+                        if 'multipart' in c_type or 'mixed-replace' in c_type or 'octet-stream' in c_type or 'video' in c_type:
+                            stream_resp = r
+                            active_url = cand
+                            is_snapshot_endpoint = False
+                            print(f"[Server] Connected to MJPEG stream at: {active_url}")
+                            break
+                        elif 'image/' in c_type:
+                            # Single JPEG capture endpoint (e.g. /capture or /shot.jpg)
+                            stream_resp = r
+                            active_url = cand
+                            is_snapshot_endpoint = True
+                            print(f"[Server] Connected to snapshot endpoint at: {active_url}")
+                            break
+                except Exception:
+                    continue
+
+            # Strategy 2A: Continuous Snapshot Polling Loop (for /capture endpoints)
+            if is_snapshot_endpoint and active_url:
+                # Close the probing connection first to avoid socket leak
+                if stream_resp is not None:
+                    try:
+                        stream_resp.close()
+                    except Exception:
+                        pass
+                frame_idx = 0
+                while True:
+                    try:
+                        resp = requests.get(active_url, timeout=3.0, headers=headers)
+                        try:
+                            if resp.status_code == 200:
+                                np_arr = np.frombuffer(resp.content, dtype=np.uint8)
+                                frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                                if frame is not None:
+                                    if enable_yolo and yolo_worker:
+                                        yolo_worker.update_frame(frame)
+                                        detected, conf, boxes = yolo_worker.get_results()
+                                        frame = draw_detection_hud(frame, detected, conf, boxes)
+                                        latest_camera_result = {
+                                            "human_detected": detected,
+                                            "confidence": float(conf),
+                                            "box_count": len(boxes),
+                                            "last_update": time.time(),
+                                            "source": "esp32_cam"
+                                        }
+                                    else:
+                                        cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                                        latest_camera_result = {
+                                            "human_detected": False,
+                                            "confidence": 0.0,
+                                            "box_count": 0,
+                                            "last_update": time.time(),
+                                            "source": "esp32_cam"
+                                        }
+
+                                    _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                                    yield (b'--frame\r\n'
+                                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                        finally:
+                            try:
+                                resp.close()
+                            except Exception:
+                                pass
+                        time.sleep(0.06)
+                        frame_idx += 1
+                    except Exception as snap_err:
+                        print(f"[Server] Snapshot poll error: {snap_err}")
+                        time.sleep(0.5)
+                return
+
+            # Strategy 2B: MJPEG Streaming with Frame Buffering
+            if stream_resp is not None and not is_snapshot_endpoint:
+                byte_data = b''
+                try:
+                    for chunk in stream_resp.iter_content(chunk_size=4096):
+                        if not chunk:
+                            continue
+                        byte_data += chunk
                         
-                        # Frame-skipping: if buffer accumulated backlogged frames during inference,
-                        # jump to the most recent frame to ensure zero lag
-                        if len(byte_data) > 16384:
-                            last_a = byte_data.rfind(b'\xff\xd8')
-                            if last_a > 0:
-                                last_b = byte_data.find(b'\xff\xd9', last_a + 2)
-                                if last_b != -1:
-                                    jpg = byte_data[last_a:last_b+2]
-                                    byte_data = byte_data[last_b+2:]
-                        
-                        np_arr = np.frombuffer(jpg, dtype=np.uint8)
-                        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-                        
-                        if frame is not None:
-                            frame, detected, conf, boxes = detect_humans(frame)
+                        while True:
+                            a = byte_data.find(b'\xff\xd8')
+                            if a == -1:
+                                if len(byte_data) > 8192:
+                                    byte_data = byte_data[-2048:]
+                                break
                             
+                            b = byte_data.find(b'\xff\xd9', a + 2)
+                            if b == -1:
+                                # If buffer is excessively large without EOI, drop corrupted data
+                                if len(byte_data) - a > 131072:
+                                    next_a = byte_data.find(b'\xff\xd8', a + 2)
+                                    if next_a != -1:
+                                        byte_data = byte_data[next_a:]
+                                    else:
+                                        byte_data = byte_data[-4096:]
+                                break
+                            
+                            jpg = byte_data[a:b+2]
+                            byte_data = byte_data[b+2:]
+                            
+                            # Frame-skipping: if buffer has accumulated backlogged frames, jump to latest
+                            if len(byte_data) > 32768:
+                                last_a = byte_data.rfind(b'\xff\xd8')
+                                if last_a > 0:
+                                    last_b = byte_data.find(b'\xff\xd9', last_a + 2)
+                                    if last_b != -1:
+                                        jpg = byte_data[last_a:last_b+2]
+                                        byte_data = byte_data[last_b+2:]
+                            
+                            np_arr = np.frombuffer(jpg, dtype=np.uint8)
+                            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                            
+                            if frame is not None:
+                                if enable_yolo and yolo_worker:
+                                    yolo_worker.update_frame(frame)
+                                    detected, conf, boxes = yolo_worker.get_results()
+                                    frame = draw_detection_hud(frame, detected, conf, boxes)
+                                    latest_camera_result = {
+                                        "human_detected": detected,
+                                        "confidence": float(conf),
+                                        "box_count": len(boxes),
+                                        "last_update": time.time(),
+                                        "source": "esp32_cam"
+                                    }
+                                else:
+                                    cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                                    latest_camera_result = {
+                                        "human_detected": False,
+                                        "confidence": 0.0,
+                                        "box_count": 0,
+                                        "last_update": time.time(),
+                                        "source": "esp32_cam"
+                                    }
+                                
+                                _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                                yield (b'--frame\r\n'
+                                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                except Exception as stream_err:
+                    print(f"[Server] MJPEG stream reading interrupted: {stream_err}")
+                finally:
+                    try:
+                        stream_resp.close()
+                    except Exception:
+                        pass
+
+            # Strategy 2C: Fallback to OpenCV VideoCapture (handles RTSP, non-standard HTTP, etc.)
+            try:
+                print(f"[Server] Attempting OpenCV VideoCapture on: {clean_url}")
+                cap = cv2.VideoCapture(clean_url)
+                if cap.isOpened():
+                    while True:
+                        ret, frame = cap.read()
+                        if not ret or frame is None:
+                            time.sleep(0.05)
+                            continue
+                        if enable_yolo and yolo_worker:
+                            yolo_worker.update_frame(frame)
+                            detected, conf, boxes = yolo_worker.get_results()
+                            frame = draw_detection_hud(frame, detected, conf, boxes)
                             latest_camera_result = {
                                 "human_detected": detected,
                                 "confidence": float(conf),
@@ -481,16 +799,49 @@ def stream_yolo():
                                 "last_update": time.time(),
                                 "source": "esp32_cam"
                             }
-                            
-                            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                            yield (b'--frame\r\n'
-                                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                elif len(byte_data) > 32768:
-                    byte_data = byte_data[-4096:]
-                    
-        except Exception as e:
-            print(f"[Server] Stream proxy error: {e}")
-            yield from generate_demo()
+                        else:
+                            cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                            latest_camera_result = {
+                                "human_detected": False,
+                                "confidence": 0.0,
+                                "box_count": 0,
+                                "last_update": time.time(),
+                                "source": "esp32_cam"
+                            }
+
+                        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+            except Exception as cap_err:
+                print(f"[Server] VideoCapture fallback error: {cap_err}")
+
+            # Strategy 2D: Camera is unreachable — yield informative diagnostic HUD frames
+            print(f"[Server] Camera node unreachable at: {clean_url}")
+            diag_frame_idx = 0
+            details = [
+                f"TARGET URL: {clean_url}",
+                "⚠ 1. Ensure ESP32-CAM is powered ON (5V / GND)",
+                "⚠ 2. Connect PC WiFi to 'TERRA-SENSE-ESP32' Hotspot",
+                "⚠ 3. Standard stream endpoint is: 192.168.4.2/stream",
+                "✓ Retrying connection automatically..."
+            ]
+            while True:
+                diag_frame_idx += 1
+                diag_jpg = create_diagnostic_frame(
+                    title="CAMERA NODE OFFLINE / UNREACHABLE",
+                    subtitle="SEARCH & RESCUE OPTICAL SENSOR LINK FAILED",
+                    details=details,
+                    frame_idx=diag_frame_idx
+                )
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + diag_jpg + b'\r\n')
+                time.sleep(1.0)
+        finally:
+            if yolo_worker is not None:
+                try:
+                    yolo_worker.stop()
+                except Exception:
+                    pass
 
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
@@ -544,16 +895,37 @@ def analyze_snapshot():
             clean_url = target_url
             if not clean_url.startswith(('http://', 'https://')):
                 clean_url = 'http://' + clean_url
-                
-            resp = requests.get(clean_url, timeout=5)
-            if resp.status_code != 200:
-                return jsonify({"status": "error", "message": "Failed to retrieve frame from camera"}), 502
-                
-            np_arr = np.frombuffer(resp.content, dtype=np.uint8)
-            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
+            # Try candidates: clean_url, clean_url/capture, clean_url/shot.jpg
+            candidates = [clean_url]
+            base_no_slash = clean_url.rstrip('/')
+            if not base_no_slash.endswith(('/capture', '/shot.jpg')):
+                candidates.insert(0, base_no_slash + '/capture')
+                candidates.insert(1, base_no_slash + '/shot.jpg')
+
+            frame = None
+            for cand in candidates:
+                try:
+                    resp = requests.get(cand, timeout=4, headers={'User-Agent': 'TerraSense-AI-Proxy/2.0'})
+                    if resp.status_code == 200 and resp.content:
+                        # Find JPEG in case of multipart or raw image
+                        content = resp.content
+                        a = content.find(b'\xff\xd8')
+                        if a != -1:
+                            b = content.find(b'\xff\xd9', a + 2)
+                            if b != -1:
+                                content = content[a:b+2]
+                            else:
+                                content = content[a:]
+                        np_arr = np.frombuffer(content, dtype=np.uint8)
+                        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                        if frame is not None:
+                            break
+                except Exception:
+                    continue
+
             if frame is None:
-                return jsonify({"status": "error", "message": "Failed to decode camera frame"}), 500
+                return jsonify({"status": "error", "message": f"Failed to retrieve/decode frame from camera ({clean_url})"}), 502
             
         frame, detected, conf, boxes = detect_humans(frame)
         

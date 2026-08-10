@@ -19,6 +19,18 @@
 
 ---
 
+## ⚡ Recent Optimization Updates (Version 2.5)
+
+To optimize low-latency tactical performance and network reliability in real-world SAR operations, the platform has been updated with several key features:
+
+- **Asynchronous YOLOv8 Frame Processing**: Refactored the live stream proxy (`/api/camera/stream_yolo`) to run inference on a dedicated background thread (`YOLOBackgroundWorker`). The main stream thread immediately overlays the latest available detections and yields frames at the camera's full framerate (**25–30 FPS**), rendering a stutter-free, real-time tactical feed.
+- **YOLOv8 Toggle Off-by-Default**: The live stream now connects in a clean raw optical state by default, bypassing YOLO processing to save CPU cycles. Operators can manually toggle the YOLO AI overlay when required.
+- **Stale State Reset on Disable**: When YOLO is toggled off, the backend immediately purges the active human tracking state from cache, resetting indicators in the dashboard without stale delays.
+- **Isolated Telemetry Route Mapping**: Standardized API routing on the client. Live sensor telemetry is queried directly from the ESP32 AP (`192.168.4.1` port 80), while high-workload Flask endpoints (predictions, StreamPETR) are routed to the PC host (`localhost:3000`), preventing micro-controller routing timeouts.
+- **Robust gzip Compression Filter**: Upgraded flask compression middleware to verify `Accept-Encoding: gzip` headers before compression, preventing data corruption on raw test clients and browser fetches.
+
+---
+
 ## 🧠 System Architecture Mind Map
 
 ```

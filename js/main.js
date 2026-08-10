@@ -12,41 +12,41 @@
  *  EXTREME  (< 1 h)   : #ef4444  red
  * ─────────────────────────────────────────────────────────────────── */
 function survivalColor(oxyHours) {
-  if (oxyHours >= 6) return { hex: 0x10b981, str: '#10b981', label: 'STABLE',   css: 'var(--accent-emerald)' };
-  if (oxyHours >= 4) return { hex: 0x00f2fe, str: '#00f2fe', label: 'MODERATE', css: 'var(--primary-cyan)'   };
-  if (oxyHours >= 2) return { hex: 0xfbbf24, str: '#fbbf24', label: 'HIGH',     css: 'var(--accent-amber)'  };
-  if (oxyHours >= 1) return { hex: 0xf97316, str: '#f97316', label: 'CRITICAL', css: '#f97316'              };
-  return              { hex: 0xef4444, str: '#ef4444', label: 'EXTREME',  css: 'var(--accent-rose)'  };
+  if (oxyHours >= 6) return { hex: 0x10b981, str: '#10b981', label: 'STABLE', css: 'var(--accent-emerald)' };
+  if (oxyHours >= 4) return { hex: 0x00f2fe, str: '#00f2fe', label: 'MODERATE', css: 'var(--primary-cyan)' };
+  if (oxyHours >= 2) return { hex: 0xfbbf24, str: '#fbbf24', label: 'HIGH', css: 'var(--accent-amber)' };
+  if (oxyHours >= 1) return { hex: 0xf97316, str: '#f97316', label: 'CRITICAL', css: '#f97316' };
+  return { hex: 0xef4444, str: '#ef4444', label: 'EXTREME', css: 'var(--accent-rose)' };
 }
 
 // 4 Scan Sectors
 const SECTORS = [
   { id: 'A', label: 'SECTOR A', cx: -2.5, cz: -2.5, color: 0x00f2fe, colorStr: '#00f2fe', desc: 'NW Quadrant' },
-  { id: 'B', label: 'SECTOR B', cx:  2.5, cz: -2.5, color: 0xfbbf24, colorStr: '#fbbf24', desc: 'NE Quadrant' },
-  { id: 'C', label: 'SECTOR C', cx: -2.5, cz:  2.5, color: 0x10b981, colorStr: '#10b981', desc: 'SW Quadrant' },
-  { id: 'D', label: 'SECTOR D', cx:  2.5, cz:  2.5, color: 0x8b5cf6, colorStr: '#8b5cf6', desc: 'SE Quadrant' },
+  { id: 'B', label: 'SECTOR B', cx: 2.5, cz: -2.5, color: 0xfbbf24, colorStr: '#fbbf24', desc: 'NE Quadrant' },
+  { id: 'C', label: 'SECTOR C', cx: -2.5, cz: 2.5, color: 0x10b981, colorStr: '#10b981', desc: 'SW Quadrant' },
+  { id: 'D', label: 'SECTOR D', cx: 2.5, cz: 2.5, color: 0x8b5cf6, colorStr: '#8b5cf6', desc: 'SE Quadrant' },
 ];
 
 class TerraSenseApp {
   constructor() {
     // Three.js
-    this.threeScene    = null;
-    this.threeCamera   = null;
+    this.threeScene = null;
+    this.threeCamera = null;
     this.threeRenderer = null;
     this.threeControls = null;
 
     // Per-sector 3D objects
-    this.sectorPanels      = {};
-    this.sectorLabels      = {};
-    this.epicenters        = {};
-    this.humanGroups       = {};
-    this.signalWaves       = {};
-    this.heartbeatRings    = {};
-    this.oxyBars           = {};
-    this._epicenterLights  = {};
-    this.sweepPlane        = null;
-    this.soilParticles     = null;
-    this.depthMarkers      = [];
+    this.sectorPanels = {};
+    this.sectorLabels = {};
+    this.epicenters = {};
+    this.humanGroups = {};
+    this.signalWaves = {};
+    this.heartbeatRings = {};
+    this.oxyBars = {};
+    this._epicenterLights = {};
+    this.sweepPlane = null;
+    this.soilParticles = null;
+    this.depthMarkers = [];
 
     this.activeSectorIds = [];
     this.isEspActive = false;
@@ -55,11 +55,11 @@ class TerraSenseApp {
     // Detection result state
     this.detectionResult = null;
     this._countdownInterval = null;
-    this._oxySecondsLeft    = 0;
-    this._oxyTotalSeconds   = 0;
-    this._detectedAt        = 0;
+    this._oxySecondsLeft = 0;
+    this._oxyTotalSeconds = 0;
+    this._detectedAt = 0;
 
-    this.charts   = {};
+    this.charts = {};
     this.audioCtx = null;
     this.isAudioMuted = false;
     this.isAutoRotate = false;
@@ -67,7 +67,7 @@ class TerraSenseApp {
     this.gpsBase = { lat: 28.613928, lon: 77.209060 };
     this.currentGps = "";
 
-    this.isScanning   = false;
+    this.isScanning = false;
     this.scanInterval = null;
     this.scanProgress = 0;
 
@@ -77,16 +77,16 @@ class TerraSenseApp {
     this._resizeTimeout = null;
 
     this.params = {
-      breathing:  0.31,
-      heartbeat:  1.15,
-      microamp:   0.85,
-      snr:       15.6,
-      depth:      1.45,
-      moisture:  38.0,
+      breathing: 0.31,
+      heartbeat: 1.15,
+      microamp: 0.85,
+      snr: 15.6,
+      depth: 1.45,
+      moisture: 38.0,
       dielectric: 8.4,
-      density:  1650.0
+      density: 1650.0
     };
-    
+
     this.syncUIFromParams = null; // Store reference to UI synchronization
     this.victimMeshes = [];
 
@@ -107,7 +107,7 @@ class TerraSenseApp {
     this.initHumanControls();
     this.initCameraFeed();
     this.bindEvents();
-    
+
     // Load Host IP from local storage
     const hostInput = document.getElementById('inputHostIp');
     if (hostInput) {
@@ -125,47 +125,30 @@ class TerraSenseApp {
     if (!hostIp) {
       hostIp = localStorage.getItem('terra_sense_host_ip') || '';
     }
-    
+
     // Clean hostIp to extract raw host/IP
     let cleanHost = hostIp.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').trim();
 
-    // If running from local file:// scheme, fallback to localhost:3000 to reach backend
-    if (!cleanHost && (window.location.protocol === 'file:' || !window.location.hostname)) {
-      cleanHost = 'localhost:3000';
+    // Default backend destination (Flask AI server running on the PC)
+    let backendBase = '';
+    if (cleanHost && cleanHost !== '192.168.4.1') {
+      backendBase = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
+    } else {
+      const currentHost = window.location.hostname || 'localhost';
+      const safeHost = (currentHost === '192.168.4.1') ? 'localhost' : currentHost;
+      backendBase = `${safeHost}:3000`;
     }
 
-    const isESP32Hotspot = (cleanHost === '192.168.4.1');
-
-    if (path === '/api/telemetry') {
-      if (isESP32Hotspot || cleanHost.startsWith('192.168.')) {
-        return `http://${cleanHost}/api/telemetry`;
+    // If telemetry API and we are on ESP32 Access Point (192.168.4.1), direct to the ESP32 directly on port 80
+    if (path.startsWith('/api/telemetry')) {
+      if (cleanHost === '192.168.4.1') {
+        return `http://192.168.4.1/api/telemetry`;
       }
-      if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
-        const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
-        return `http://${targetHost}${path}`;
-      }
-      return path;
     }
 
-    if (path === '/api/predict') {
-      if (isESP32Hotspot || cleanHost.startsWith('192.168.')) {
-        const localHost = (window.location.hostname && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-          ? window.location.host
-          : 'localhost:3000';
-        return `http://${localHost}/api/predict`;
-      }
-      if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
-        const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
-        return `http://${targetHost}${path}`;
-      }
-      return path;
-    }
-
-    if (cleanHost && cleanHost !== 'localhost' && cleanHost !== '127.0.0.1' && cleanHost !== window.location.hostname) {
-      const targetHost = cleanHost.includes(':') ? cleanHost : `${cleanHost}:3000`;
-      return `http://${targetHost}${path}`;
-    }
-    return path;
+    // Ensure path has leading slash
+    const cleanPath = path.startsWith('/') ? path : `/${path}`;
+    return `http://${backendBase}${cleanPath}`;
   }
 
   getSectorGps(sectorId) {
@@ -174,7 +157,7 @@ class TerraSenseApp {
     else if (sectorId === 'B') { latOff *= 1; lonOff *= 1; }
     else if (sectorId === 'C') { latOff *= -1; lonOff *= -1; }
     else if (sectorId === 'D') { latOff *= -1; lonOff *= 1; }
-    
+
     const lat = this.gpsBase.lat + latOff;
     const lon = this.gpsBase.lon + lonOff;
     return `${lat.toFixed(6)}° N, ${Math.abs(lon).toFixed(6)}° E`;
@@ -277,7 +260,7 @@ class TerraSenseApp {
 
     let flashOn = false;
     let isDemoMode = false;
-    let isYoloActive = true;
+    let isYoloActive = false;
     let yoloPollInterval = null;
     let lastDetectedState = false;
 
@@ -290,7 +273,7 @@ class TerraSenseApp {
       if (yoloPollInterval) clearInterval(yoloPollInterval);
       yoloPollInterval = setInterval(() => {
         if (!isYoloActive || isDemoMode) return;
-        fetch('/api/camera/latest_detection')
+        fetch(this.getApiUrl('/api/camera/latest_detection'))
           .then(res => res.json())
           .then(data => {
             if (data.status === 'success' && data.fresh) {
@@ -308,6 +291,7 @@ class TerraSenseApp {
                   yoloAlert.style.display = 'block';
                   yoloAlert.textContent = `⚠ HUMAN: ${data.confidence_pct}% (${data.box_count} target${data.box_count > 1 ? 's' : ''})`;
                   yoloAlert.style.background = 'rgba(244,63,94,0.95)';
+                  yoloAlert.style.color = '#fff';
                   if (!lastDetectedState) {
                     this.playBeep(784, 0.25);
                   }
@@ -316,12 +300,21 @@ class TerraSenseApp {
                   yoloAlert.style.display = 'block';
                   yoloAlert.textContent = '✓ SCANNING — 0 TARGETS';
                   yoloAlert.style.background = 'rgba(16, 185, 129, 0.85)';
+                  yoloAlert.style.color = '#fff';
                   lastDetectedState = false;
                 }
               }
+            } else {
+              // If backend doesn't have a fresh camera stream, keep scanning indicator active
+              if (yoloAlert && isYoloActive && !isDemoMode) {
+                yoloAlert.style.display = 'block';
+                yoloAlert.textContent = '👁 CONNECTING AI SCANNER...';
+                yoloAlert.style.background = 'rgba(251, 191, 36, 0.85)'; // Yellow / Amber warning
+                yoloAlert.style.color = '#040711';
+              }
             }
           })
-          .catch(() => {});
+          .catch(() => { });
       }, 400);
     };
 
@@ -367,39 +360,36 @@ class TerraSenseApp {
       localStorage.setItem('terra_sense_cam_url', formattedUrl);
       if (inputCamIp) inputCamIp.value = formattedUrl;
 
-      setStatus(true, 'CONNECTING AI STREAM...');
-      
+      setStatus(true, isYoloActive ? 'CONNECTING YOLO DETECT STREAM...' : 'CONNECTING RAW STREAM...');
+
       if (imgStream) {
         imgStream.onerror = () => {
           setStatus(false, 'STREAM OFFLINE / TIMEOUT');
           imgStream.style.display = 'none';
           if (placeholder) placeholder.style.display = 'block';
-          if (yoloAlert) yoloAlert.style.display = 'none';
-          stopYoloDetectionPolling();
+          // Do NOT clear yoloAlert or stop polling! Keep polling the backend for human detection status.
         };
 
+        // Always route through Flask stream proxy to support single-connection ESP32-CAM nodes and avoid mixed-content/CORS blocks
+        const proxyUrl = `/api/camera/stream_yolo?url=${encodeURIComponent(formattedUrl)}&yolo=${isYoloActive ? 'true' : 'false'}`;
+        imgStream.src = this.getApiUrl(proxyUrl);
+
         if (isYoloActive) {
-          imgStream.src = `/api/camera/stream_yolo?url=${encodeURIComponent(formattedUrl)}`;
           if (yoloAlert) {
             yoloAlert.style.display = 'block';
-            yoloAlert.textContent = '👁 AI SCANNING...';
-            yoloAlert.style.background = 'rgba(0,242,254,0.85)';
+            yoloAlert.textContent = '👁 CONNECTING AI SCANNER...';
+            yoloAlert.style.background = 'rgba(251, 191, 36, 0.85)';
             yoloAlert.style.color = '#040711';
           }
           startYoloDetectionPolling();
         } else {
           stopYoloDetectionPolling();
-          if (formattedUrl === 'webcam') {
-            imgStream.src = `/api/camera/stream_yolo?url=webcam`;
-          } else {
-            imgStream.src = formattedUrl;
-          }
           if (yoloAlert) yoloAlert.style.display = 'none';
         }
 
         imgStream.style.display = 'block';
         if (placeholder) placeholder.style.display = 'none';
-        
+
         setTimeout(() => {
           if (imgStream.style.display !== 'none') {
             setStatus(true, isYoloActive ? 'LIVE AI YOLO DETECT ONLINE' : 'LIVE OPTICAL FEED ONLINE');
@@ -446,7 +436,7 @@ class TerraSenseApp {
           try {
             const urlObj = new URL(formatted);
             const targetLedUrl = `${urlObj.origin}/led?state=${flashOn ? 'on' : 'off'}`;
-            fetch(`/api/camera/proxy?url=${encodeURIComponent(targetLedUrl)}`)
+            fetch(this.getApiUrl(`/api/camera/proxy?url=${encodeURIComponent(targetLedUrl)}`))
               .catch(err => console.warn('Flash command error:', err));
           } catch (e) {
             console.warn('Invalid URL for flash:', camIp);
@@ -460,10 +450,10 @@ class TerraSenseApp {
       btnSnapshot.addEventListener('click', () => {
         const camIp = inputCamIp ? inputCamIp.value.trim() : '';
         this.playBeep(880, 0.15);
-        
+
         setStatus(true, 'AI ANALYZING SNAPSHOT...');
         const isDemoTarget = isDemoMode || (!camIp && !isYoloActive);
-        
+
         let targetApi = `/api/camera/analyze_snapshot?demo=true`;
         if (!isDemoTarget && camIp) {
           if (camIp === 'webcam') {
@@ -478,8 +468,8 @@ class TerraSenseApp {
             }
           }
         }
-        
-        fetch(targetApi)
+
+        fetch(this.getApiUrl(targetApi))
           .then(res => res.json())
           .then(data => {
             if (data.status === 'success') {
@@ -540,7 +530,7 @@ class TerraSenseApp {
           if (yoloAlert) yoloAlert.style.display = 'none';
           stopYoloDetectionPolling();
         }
-        
+
         if (imgStream && imgStream.style.display === 'block') {
           if (isDemoMode) {
             if (isYoloActive) {
@@ -636,7 +626,7 @@ class TerraSenseApp {
   /** Returns true when the last camera reading is fresh enough to fuse (< 30 s). */
   _isCameraFresh() {
     return this.latestCameraResult.source !== 'none' &&
-           (Date.now() - this.latestCameraResult.timestamp) < 30000;
+      (Date.now() - this.latestCameraResult.timestamp) < 30000;
   }
 
   /** Updates the UI indicator that shows when vision fusion is active. */
@@ -667,7 +657,7 @@ class TerraSenseApp {
   /** Appends camera fusion fields to a batch target array for /api/predict_fused. */
   _addFusionFields(body) {
     if (this._isCameraFresh()) {
-      body.camera_confidence     = this.latestCameraResult.confidence_pct / 100.0;
+      body.camera_confidence = this.latestCameraResult.confidence_pct / 100.0;
       body.camera_human_detected = this.latestCameraResult.human_detected;
     }
     return body;
@@ -761,7 +751,7 @@ class TerraSenseApp {
     [
       { y: 2.5, h: 1.0, col: 0x7a5c1a, op: 0.12 },
       { y: 1.0, h: 1.0, col: 0x5e3a1f, op: 0.09 },
-      { y:-0.5, h: 1.0, col: 0x2d2d4a, op: 0.07 },
+      { y: -0.5, h: 1.0, col: 0x2d2d4a, op: 0.07 },
     ].forEach(d => {
       const g = new THREE.BoxGeometry(10, d.h, 10);
       const m = new THREE.MeshPhongMaterial({ color: d.col, transparent: true, opacity: d.op, side: THREE.DoubleSide, depthWrite: false });
@@ -947,13 +937,13 @@ class TerraSenseApp {
       m.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), wireMat()));
     };
 
-    addPart(new THREE.SphereGeometry(0.13, 10, 10),    0, 0.62, 0);
-    addPart(new THREE.CylinderGeometry(0.11, 0.14, 0.4, 8),  0, 0.28, 0);
+    addPart(new THREE.SphereGeometry(0.13, 10, 10), 0, 0.62, 0);
+    addPart(new THREE.CylinderGeometry(0.11, 0.14, 0.4, 8), 0, 0.28, 0);
     addPart(new THREE.CylinderGeometry(0.14, 0.11, 0.24, 8), 0, 0.02, 0);
-    addPart(new THREE.CylinderGeometry(0.04, 0.04, 0.36, 6), -0.2, 0.28, 0, 0,  0.2);
-    addPart(new THREE.CylinderGeometry(0.04, 0.04, 0.36, 6),  0.2, 0.28, 0, 0, -0.2);
+    addPart(new THREE.CylinderGeometry(0.04, 0.04, 0.36, 6), -0.2, 0.28, 0, 0, 0.2);
+    addPart(new THREE.CylinderGeometry(0.04, 0.04, 0.36, 6), 0.2, 0.28, 0, 0, -0.2);
     addPart(new THREE.CylinderGeometry(0.055, 0.045, 0.38, 6), -0.08, -0.32, 0);
-    addPart(new THREE.CylinderGeometry(0.055, 0.045, 0.38, 6),  0.08, -0.32, 0);
+    addPart(new THREE.CylinderGeometry(0.055, 0.045, 0.38, 6), 0.08, -0.32, 0);
 
     return group;
   }
@@ -998,16 +988,16 @@ class TerraSenseApp {
       const x = (Math.random() - 0.5) * 9.4;
       const y = Math.random() * 6 - 3;
       const z = (Math.random() - 0.5) * 9.4;
-      pos[i*3]=x; pos[i*3+1]=y; pos[i*3+2]=z;
-      if (y > 2)      c.setHSL(0.12, 0.5,  0.13 + Math.random()*0.07);
-      else if (y > 1) c.setHSL(0.08, 0.55, 0.10 + Math.random()*0.07);
-      else if (y > 0) c.setHSL(0.05, 0.45, 0.09 + Math.random()*0.05);
-      else            c.setHSL(0.65, 0.2,  0.07 + Math.random()*0.05);
-      col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+      pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+      if (y > 2) c.setHSL(0.12, 0.5, 0.13 + Math.random() * 0.07);
+      else if (y > 1) c.setHSL(0.08, 0.55, 0.10 + Math.random() * 0.07);
+      else if (y > 0) c.setHSL(0.05, 0.45, 0.09 + Math.random() * 0.05);
+      else c.setHSL(0.65, 0.2, 0.07 + Math.random() * 0.05);
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     this.soilParticles = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.085, vertexColors: true, transparent: true, opacity: 0.55, depthWrite: false, sizeAttenuation: true }));
     this.threeScene.add(this.soilParticles);
   }
@@ -1356,18 +1346,18 @@ class TerraSenseApp {
     // Per-sector animation
     SECTORS.forEach(sec => {
       const sphere = this.epicenters[sec.id];
-      const waves  = this.signalWaves[sec.id];
+      const waves = this.signalWaves[sec.id];
       const hbRing = this.heartbeatRings[sec.id];
-      const human  = this.humanGroups[sec.id];
-      const light  = this._epicenterLights[sec.id];
+      const human = this.humanGroups[sec.id];
+      const light = this._epicenterLights[sec.id];
       const oxyBar = this.oxyBars[sec.id];
-      const targetY  = 3.0 - this.params.depth;
+      const targetY = 3.0 - this.params.depth;
       const isActive = this.activeSectorIds && this.activeSectorIds.includes(sec.id);
 
       // --- Epicenter pulse ---
       if (sphere) {
         const bs = Math.sin(time * Math.PI * 2 * this.params.breathing) * 0.10;
-        const hs = Math.sin(time * Math.PI * 2 * this.params.heartbeat)  * 0.04;
+        const hs = Math.sin(time * Math.PI * 2 * this.params.heartbeat) * 0.04;
         const sc = 1.0 + bs + hs;
         sphere.scale.set(sc, sc, sc);
         sphere.rotation.y = time * (isActive ? 0.55 : 0.18);
@@ -1396,7 +1386,7 @@ class TerraSenseApp {
       // --- Signal wave rings ---
       if (waves) {
         const speed = isActive ? 2.2 : (this.isScanning ? 1.1 : 0.35);
-        const maxOp = isActive ? 0.5  : (this.isScanning ? 0.18 : 0.07);
+        const maxOp = isActive ? 0.5 : (this.isScanning ? 0.18 : 0.07);
         waves.forEach((ring, idx) => {
           const ph = (time * speed + idx * 0.6) % 3;
           ring.scale.set(1 + ph * 1.6, 1 + ph * 1.6, 1);
@@ -1455,19 +1445,19 @@ class TerraSenseApp {
     const pal = survivalColor(oxyHours);
 
     SECTORS.forEach(s => {
-      const panel  = this.sectorPanels[s.id];
+      const panel = this.sectorPanels[s.id];
       const sphere = this.epicenters[s.id];
-      const light  = this._epicenterLights[s.id];
+      const light = this._epicenterLights[s.id];
       const oxyBar = this.oxyBars[s.id];
-      const human  = this.humanGroups[s.id];
+      const human = this.humanGroups[s.id];
 
       const isActive = sectorIds.includes(s.id);
 
       if (isActive) {
         // Active sector — apply survival palette
-        if (panel)  { panel.material.opacity = 0.25; panel.material.color.setHex(pal.hex); }
+        if (panel) { panel.material.opacity = 0.25; panel.material.color.setHex(pal.hex); }
         if (sphere) { sphere.material.color.setHex(pal.hex); sphere.material.opacity = 0.9; }
-        if (light)  { light.color.setHex(pal.hex); }
+        if (light) { light.color.setHex(pal.hex); }
         if (oxyBar) { oxyBar.material.color.setHex(pal.hex); oxyBar.material.opacity = 0.85; }
 
         if (human) {
@@ -1483,14 +1473,14 @@ class TerraSenseApp {
         // Heartbeat + signal wave rings colour
         const hbRing = this.heartbeatRings[s.id];
         if (hbRing) { hbRing.material.color.setHex(pal.hex); hbRing.material.opacity = 0.85; }
-        const waves  = this.signalWaves[s.id];
+        const waves = this.signalWaves[s.id];
         if (waves) waves.forEach(r => { r.material.color.setHex(pal.hex); r.material.opacity = 0.45; });
 
       } else {
         // Dim other sectors
-        if (panel)  panel.material.opacity = 0.025;
+        if (panel) panel.material.opacity = 0.025;
         if (sphere) sphere.material.opacity = 0.15;
-        if (human)  human.visible = false;
+        if (human) human.visible = false;
         if (oxyBar) oxyBar.material.opacity = 0;
         const hbRing = this.heartbeatRings[s.id];
         if (hbRing) hbRing.material.opacity = 0;
@@ -1517,12 +1507,12 @@ class TerraSenseApp {
     SECTORS.forEach(s => {
       const p = this.sectorPanels[s.id];
       const sp = this.epicenters[s.id];
-      if (p)  p.material.opacity = 0.07;
+      if (p) p.material.opacity = 0.07;
       if (sp) { sp.material.color.setHex(s.color); sp.material.opacity = 0.5; }
       const l = this._epicenterLights[s.id];
-      if (l)  l.color.setHex(s.color);
+      if (l) l.color.setHex(s.color);
       const h = this.humanGroups[s.id];
-      if (h)  h.visible = false;
+      if (h) h.visible = false;
       const ob = this.oxyBars[s.id];
       if (ob) ob.material.opacity = 0;
     });
@@ -1557,7 +1547,7 @@ class TerraSenseApp {
         LOCATIONS: <span style="font-weight:700;">${locationNames}</span><br>
         STATUS: <span style="color:${pal.str};font-weight:700;">${pal.label}</span><br>
         DEPTH: ${this.params.depth.toFixed(2)} m<br>
-        BREATH: ${(this.params.breathing*60).toFixed(0)} bpm | PULSE: ${(this.params.heartbeat*60).toFixed(0)} bpm<br>
+        BREATH: ${(this.params.breathing * 60).toFixed(0)} bpm | PULSE: ${(this.params.heartbeat * 60).toFixed(0)} bpm<br>
         OXYGEN: <span id="oxyCountdown3d" style="color:${pal.str};font-weight:700;">--</span>
       `;
     } else if (state === 'CLEAR') {
@@ -1571,15 +1561,15 @@ class TerraSenseApp {
   // ═══════════════════════════════════════════════════════════════
   _startOxygenCountdown(oxyHours) {
     if (this._countdownInterval) clearInterval(this._countdownInterval);
-    this._oxyTotalSeconds   = Math.round(oxyHours * 3600);
-    this._oxySecondsLeft    = this._oxyTotalSeconds;
-    this._detectedAt        = performance.now();
+    this._oxyTotalSeconds = Math.round(oxyHours * 3600);
+    this._oxySecondsLeft = this._oxyTotalSeconds;
+    this._detectedAt = performance.now();
 
     const fmt = (s) => {
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       const ss = s % 60;
-      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
     };
 
     const tick = () => {
@@ -1592,14 +1582,14 @@ class TerraSenseApp {
 
       // Main countdown elements
       const cdMain = document.getElementById('oxyCountdownMain');
-      const cdBar  = document.getElementById('oxyBarFill');
-      const cd3d   = document.getElementById('oxyCountdown3d');
-      const cdPct  = document.getElementById('oxyPctDisplay');
+      const cdBar = document.getElementById('oxyBarFill');
+      const cd3d = document.getElementById('oxyCountdown3d');
+      const cdPct = document.getElementById('oxyPctDisplay');
 
       if (cdMain) { cdMain.textContent = display; cdMain.style.color = pal.str; }
-      if (cdBar)  { cdBar.style.width = `${Math.round(frac * 100)}%`; cdBar.style.background = pal.str; }
-      if (cd3d)   { cd3d.textContent = display; cd3d.style.color = pal.str; }
-      if (cdPct)  { cdPct.textContent = `${Math.round(frac * 100)}%`; cdPct.style.color = pal.str; }
+      if (cdBar) { cdBar.style.width = `${Math.round(frac * 100)}%`; cdBar.style.background = pal.str; }
+      if (cd3d) { cd3d.textContent = display; cd3d.style.color = pal.str; }
+      if (cdPct) { cdPct.textContent = `${Math.round(frac * 100)}%`; cdPct.style.color = pal.str; }
 
       if (this._oxySecondsLeft <= 0) {
         clearInterval(this._countdownInterval);
@@ -1627,7 +1617,7 @@ class TerraSenseApp {
 
     panel.innerHTML = SECTORS.map(s => {
       const isActive = activeSectorIds && activeSectorIds.includes(s.id);
-      const bg  = isActive ? `rgba(${this._hexToRgb(s.color)},0.18)` : 'rgba(255,255,255,0.02)';
+      const bg = isActive ? `rgba(${this._hexToRgb(s.color)},0.18)` : 'rgba(255,255,255,0.02)';
       const bdr = isActive ? (pal ? pal.str : s.colorStr) : 'rgba(255,255,255,0.06)';
       const statusTxt = isActive ? `⚠ ${pal ? pal.label : ''} ${prob}%` : 'CLEAR';
       const statusCol = isActive ? (pal ? pal.str : s.colorStr) : '#4e6178';
@@ -1643,7 +1633,7 @@ class TerraSenseApp {
   }
 
   _hexToRgb(hex) {
-    return `${(hex>>16)&255},${(hex>>8)&255},${hex&255}`;
+    return `${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255}`;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -1655,18 +1645,19 @@ class TerraSenseApp {
       this.charts['harmonics'] = new Chart(ctxH, {
         type: 'line',
         data: {
-          labels: Array.from({length:50},(_,i)=>(i*0.1).toFixed(1)),
+          labels: Array.from({ length: 50 }, (_, i) => (i * 0.1).toFixed(1)),
           datasets: [
             { label: 'Breathing (Hz)', borderColor: '#00f2fe', backgroundColor: 'rgba(0,242,254,0.04)', borderWidth: 2, pointRadius: 0, data: Array(50).fill(0), fill: true },
-            { label: 'Heartbeat (Hz)', borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.04)',  borderWidth: 1.5, pointRadius: 0, data: Array(50).fill(0), fill: true }
+            { label: 'Heartbeat (Hz)', borderColor: '#f43f5e', backgroundColor: 'rgba(244,63,94,0.04)', borderWidth: 1.5, pointRadius: 0, data: Array(50).fill(0), fill: true }
           ]
         },
-        options: { responsive:true, maintainAspectRatio:false, animation:{duration:350},
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
           scales: {
-            x: { ticks:{color:'#4e6178',font:{family:'JetBrains Mono',size:8}}, grid:{color:'rgba(255,255,255,0.02)'} },
-            y: { ticks:{color:'#4e6178',font:{family:'JetBrains Mono',size:8}}, grid:{color:'rgba(255,255,255,0.03)'}, min:-1.5, max:1.5 }
+            x: { ticks: { color: '#4e6178', font: { family: 'JetBrains Mono', size: 8 } }, grid: { color: 'rgba(255,255,255,0.02)' } },
+            y: { ticks: { color: '#4e6178', font: { family: 'JetBrains Mono', size: 8 } }, grid: { color: 'rgba(255,255,255,0.03)' }, min: -1.5, max: 1.5 }
           },
-          plugins: { legend:{labels:{color:'#94a3b8',font:{family:'Rajdhani',weight:'bold'}}} }
+          plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Rajdhani', weight: 'bold' } } } }
         }
       });
     }
@@ -1676,15 +1667,16 @@ class TerraSenseApp {
       this.charts['depth'] = new Chart(ctxD, {
         type: 'bar',
         data: {
-          labels: Array.from({length:15},(_,i)=>`${(i*0.5).toFixed(1)}m`),
-          datasets: [{ label:'Dielectric Attenuation (dB)', backgroundColor:'rgba(59,130,246,0.45)', borderColor:'#3b82f6', borderWidth:1.5, data:Array(15).fill(0) }]
+          labels: Array.from({ length: 15 }, (_, i) => `${(i * 0.5).toFixed(1)}m`),
+          datasets: [{ label: 'Dielectric Attenuation (dB)', backgroundColor: 'rgba(59,130,246,0.45)', borderColor: '#3b82f6', borderWidth: 1.5, data: Array(15).fill(0) }]
         },
-        options: { responsive:true, maintainAspectRatio:false, animation:{duration:350},
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
           scales: {
-            x: { ticks:{color:'#4e6178',font:{family:'JetBrains Mono',size:8}}, grid:{display:false} },
-            y: { ticks:{color:'#4e6178',font:{family:'JetBrains Mono',size:8}}, grid:{color:'rgba(255,255,255,0.03)'} }
+            x: { ticks: { color: '#4e6178', font: { family: 'JetBrains Mono', size: 8 } }, grid: { display: false } },
+            y: { ticks: { color: '#4e6178', font: { family: 'JetBrains Mono', size: 8 } }, grid: { color: 'rgba(255,255,255,0.03)' } }
           },
-          plugins: { legend:{labels:{color:'#94a3b8',font:{family:'Rajdhani',weight:'bold'}}} }
+          plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Rajdhani', weight: 'bold' } } } }
         }
       });
     }
@@ -1694,15 +1686,16 @@ class TerraSenseApp {
       this.charts['history'] = new Chart(ctxHist, {
         type: 'line',
         data: {
-          labels: ['Scan 01','Scan 02','Scan 03','Scan 04','Scan 05'],
-          datasets: [{ label:'Human Life Consensus (%)', borderColor:'#fbbf24', backgroundColor:'rgba(251,191,36,0.05)', borderWidth:2, data:[15,12,92,98,98.6], fill:true }]
+          labels: ['Scan 01', 'Scan 02', 'Scan 03', 'Scan 04', 'Scan 05'],
+          datasets: [{ label: 'Human Life Consensus (%)', borderColor: '#fbbf24', backgroundColor: 'rgba(251,191,36,0.05)', borderWidth: 2, data: [15, 12, 92, 98, 98.6], fill: true }]
         },
-        options: { responsive:true, maintainAspectRatio:false, animation:{duration:350},
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 350 },
           scales: {
-            x: { ticks:{color:'#4e6178'}, grid:{display:false} },
-            y: { ticks:{color:'#4e6178'}, grid:{color:'rgba(255,255,255,0.03)'}, min:0, max:100 }
+            x: { ticks: { color: '#4e6178' }, grid: { display: false } },
+            y: { ticks: { color: '#4e6178' }, grid: { color: 'rgba(255,255,255,0.03)' }, min: 0, max: 100 }
           },
-          plugins: { legend:{labels:{color:'#94a3b8',font:{family:'Rajdhani',weight:'bold'}}} }
+          plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Rajdhani', weight: 'bold' } } } }
         }
       });
     }
@@ -1712,8 +1705,8 @@ class TerraSenseApp {
     const chart = this.charts['harmonics'];
     if (!chart) return;
     const bHz = this.params.breathing, hHz = this.params.heartbeat;
-    chart.data.datasets[0].data = Array.from({length:50},(_,i)=>Math.sin(i*0.1*Math.PI*2*bHz));
-    chart.data.datasets[1].data = Array.from({length:50},(_,i)=>Math.sin(i*0.1*Math.PI*2*hHz)*0.6+(Math.random()-0.5)*0.05);
+    chart.data.datasets[0].data = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.1 * Math.PI * 2 * bHz));
+    chart.data.datasets[1].data = Array.from({ length: 50 }, (_, i) => Math.sin(i * 0.1 * Math.PI * 2 * hHz) * 0.6 + (Math.random() - 0.5) * 0.05);
     chart.update('none');
   }
 
@@ -1721,7 +1714,7 @@ class TerraSenseApp {
     const chart = this.charts['depth'];
     if (!chart) return;
     const di = Math.round(this.params.depth / 0.5);
-    chart.data.datasets[0].data = Array.from({length:15},(_,i)=>{ let v=-2*i; if(i===di) v+=this.params.snr; return v; });
+    chart.data.datasets[0].data = Array.from({ length: 15 }, (_, i) => { let v = -2 * i; if (i === di) v += this.params.snr; return v; });
     chart.update('none');
   }
 
@@ -1795,7 +1788,7 @@ class TerraSenseApp {
       const hostInput = document.getElementById('inputHostIp');
       const hostIp = hostInput ? hostInput.value.trim() : '';
       localStorage.setItem('terra_sense_host_ip', hostIp);
-      
+
       const btn = document.getElementById('btnApplyHostIp');
       if (btn) {
         btn.textContent = "SAVED";
@@ -1808,7 +1801,7 @@ class TerraSenseApp {
         }, 1200);
       }
       this.playBeep(520, 0.07);
-      
+
       // Trigger immediate telemetry poll
       this.pollTelemetry();
     });
@@ -1893,10 +1886,10 @@ class TerraSenseApp {
     // Sector quick focus buttons & animations
     const sectorNavMap = {
       'btnFocusSectorAll': { sector: 'ALL', pos: { x: 0, y: 13, z: 15 }, target: { x: 0, y: 0, z: 0 } },
-      'btnFocusSectorA':   { sector: 'A',   pos: { x: -4.5, y: 7.5, z: -1 }, target: { x: -2.5, y: 0, z: -2.5 } },
-      'btnFocusSectorB':   { sector: 'B',   pos: { x: 4.5, y: 7.5, z: -1 },  target: { x: 2.5, y: 0, z: -2.5 } },
-      'btnFocusSectorC':   { sector: 'C',   pos: { x: -4.5, y: 7.5, z: 4.5 }, target: { x: -2.5, y: 0, z: 2.5 } },
-      'btnFocusSectorD':   { sector: 'D',   pos: { x: 4.5, y: 7.5, z: 4.5 },  target: { x: 2.5, y: 0, z: 2.5 } }
+      'btnFocusSectorA': { sector: 'A', pos: { x: -4.5, y: 7.5, z: -1 }, target: { x: -2.5, y: 0, z: -2.5 } },
+      'btnFocusSectorB': { sector: 'B', pos: { x: 4.5, y: 7.5, z: -1 }, target: { x: 2.5, y: 0, z: -2.5 } },
+      'btnFocusSectorC': { sector: 'C', pos: { x: -4.5, y: 7.5, z: 4.5 }, target: { x: -2.5, y: 0, z: 2.5 } },
+      'btnFocusSectorD': { sector: 'D', pos: { x: 4.5, y: 7.5, z: 4.5 }, target: { x: 2.5, y: 0, z: 2.5 } }
     };
 
     this.focusSector = (secId) => {
@@ -1905,7 +1898,7 @@ class TerraSenseApp {
       if (btn) btn.classList.add('active');
 
       const config = sectorNavMap[secId] || sectorNavMap['btnFocusSectorAll'];
-      
+
       // Animate 3D Camera smoothly
       this.animateCameraTo(config.pos, config.target);
 
@@ -1957,11 +1950,11 @@ class TerraSenseApp {
     document.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
       const el = document.activeElement;
-      if (el && (el.tagName==='INPUT'||el.tagName==='TEXTAREA'||el.tagName==='SELECT')) return;
-      if (e.code==='Space'||k==='s') { e.preventDefault(); this.startScanSequence(); }
-      else if (k==='l') { this.playBeep(440,0.1); alert('Lab Camera: Channel secured.'); }
-      else if (k==='a') { document.getElementById('btnToggleAudio')?.click(); }
-      else if (k==='r') this.exportReport();
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) return;
+      if (e.code === 'Space' || k === 's') { e.preventDefault(); this.startScanSequence(); }
+      else if (k === 'l') { this.playBeep(440, 0.1); alert('Lab Camera: Channel secured.'); }
+      else if (k === 'a') { document.getElementById('btnToggleAudio')?.click(); }
+      else if (k === 'r') this.exportReport();
     });
 
     // File Dropzone & Input handling
@@ -1970,14 +1963,14 @@ class TerraSenseApp {
 
     if (dz && fileInput) {
       // Native drag styling events on top-layer input
-      fileInput.addEventListener('dragover', (e) => { 
-        e.preventDefault(); 
-        dz.style.borderColor = '#00f2fe'; 
-        dz.style.background = 'rgba(0, 242, 254, 0.08)'; 
+      fileInput.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dz.style.borderColor = '#00f2fe';
+        dz.style.background = 'rgba(0, 242, 254, 0.08)';
       });
-      fileInput.addEventListener('dragleave', () => { 
-        dz.style.borderColor = 'var(--border-color)'; 
-        dz.style.background = 'rgba(0,0,0,0.15)'; 
+      fileInput.addEventListener('dragleave', () => {
+        dz.style.borderColor = 'var(--border-color)';
+        dz.style.background = 'rgba(0,0,0,0.15)';
       });
       fileInput.addEventListener('drop', () => {
         dz.style.borderColor = 'var(--border-color)';
@@ -2131,7 +2124,7 @@ class TerraSenseApp {
 
               const x = xIdx !== -1 ? parseFloat(row[xIdx]) || 0.0 : (Math.random() * 8.0 - 4.0);
               const y = yIdx !== -1 ? parseFloat(row[yIdx]) || 0.0 : (Math.random() * 8.0 - 4.0);
-              
+
               const temp = thermalIdx !== -1 ? parseFloat(row[thermalIdx]) || 0.0 : 0.0;
               const bme_temp_c = 22.0 + temp;
               const bme_humidity_pct = moistureIdx !== -1 ? parseFloat(row[moistureIdx]) || 35.0 : 35.0;
@@ -2188,7 +2181,7 @@ class TerraSenseApp {
           if (input) input.value = localIso;
           this.lastScanDate = localIso;
         }
-      } catch (e) {}
+      } catch (e) { }
     } else {
       const dateVal = document.getElementById('scanDateInput')?.value;
       if (dateVal) this.lastScanDate = dateVal;
@@ -2246,7 +2239,7 @@ class TerraSenseApp {
     document.getElementById('headerArrayStatus').style.color = '#ef4444';
     this._updateTelemetryOverlay('SCANNING', null, null);
 
-    const audioInt = setInterval(() => { if (this.isScanning) this.playBeep(880,0.05); else clearInterval(audioInt); }, 300);
+    const audioInt = setInterval(() => { if (this.isScanning) this.playBeep(880, 0.05); else clearInterval(audioInt); }, 300);
     const phases = [
       'STATUS: COUPLING Ground Antennas — SECTOR A…',
       'STATUS: COUPLING Ground Antennas — SECTOR B…',
@@ -2260,7 +2253,7 @@ class TerraSenseApp {
       if (this.scanProgress > 100) this.scanProgress = 100;
       document.getElementById('scanProgressBarFill').style.width = `${this.scanProgress}%`;
       document.getElementById('scanPercentVal').textContent = `${Math.round(this.scanProgress)}%`;
-      document.getElementById('scanPhaseText').textContent = phases[Math.min(Math.floor(this.scanProgress/21), phases.length-1)];
+      document.getElementById('scanPhaseText').textContent = phases[Math.min(Math.floor(this.scanProgress / 21), phases.length - 1)];
 
       const secIdx = Math.floor(this.scanProgress / 25);
       if (secIdx < 4) { const p = this.sectorPanels[SECTORS[secIdx].id]; if (p) p.material.opacity = 0.13; }
@@ -2324,13 +2317,13 @@ class TerraSenseApp {
       } else {
         // Each sector gets its real sensor reading plus small positional perturbations
         targets = SECTORS.map((sec, i) => ({
-          breathing_hz:     Math.max(0, this.params.breathing  + (Math.random() - 0.5) * 0.03),
-          heartbeat_hz:     Math.max(0, this.params.heartbeat  + (Math.random() - 0.5) * 0.06),
-          micro_amp:        Math.max(0, this.params.microamp   + (Math.random() - 0.5) * 0.04),
-          snr_db:           this.params.snr        + (Math.random() - 0.5) * 2.0,
+          breathing_hz: Math.max(0, this.params.breathing + (Math.random() - 0.5) * 0.03),
+          heartbeat_hz: Math.max(0, this.params.heartbeat + (Math.random() - 0.5) * 0.06),
+          micro_amp: Math.max(0, this.params.microamp + (Math.random() - 0.5) * 0.04),
+          snr_db: this.params.snr + (Math.random() - 0.5) * 2.0,
           dielectric_shift: this.params.dielectric + (Math.random() - 0.5) * 0.5,
-          bme_humidity_pct: this.params.moisture   + (Math.random() - 0.5) * 4.0,
-          soil_density:     this.params.density,
+          bme_humidity_pct: this.params.moisture + (Math.random() - 0.5) * 4.0,
+          soil_density: this.params.density,
           reflection_depth: Math.max(0.1, this.params.depth + (Math.random() - 0.5) * 0.3),
           x: sec.cx * 2 + 12.5,  // Map sector centre to real grid X metres
           y: sec.cz * 2 + 8.2    // Map sector centre to real grid Y metres
@@ -2349,7 +2342,7 @@ class TerraSenseApp {
         if (data.fusion_applied) console.info('[TERRA-SENSE] Vision fusion applied — camera weight 30%');
       } else {
         data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
-        data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+        data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
         data.total_targets = data.results.length;
       }
     } catch (e) {
@@ -2357,22 +2350,22 @@ class TerraSenseApp {
       const targets = this.isFileLoaded && this.parsedTargets && this.parsedTargets.length > 0
         ? this.parsedTargets
         : SECTORS.map(sec => ({
-            breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
-            micro_amp: this.params.microamp, snr_db: this.params.snr,
-            dielectric_shift: this.params.dielectric, bme_humidity_pct: this.params.moisture,
-            soil_density: this.params.density, reflection_depth: this.params.depth,
-            x: sec.cx * 2 + 12.5, y: sec.cz * 2 + 8.2
-          }));
+          breathing_hz: this.params.breathing, heartbeat_hz: this.params.heartbeat,
+          micro_amp: this.params.microamp, snr_db: this.params.snr,
+          dielectric_shift: this.params.dielectric, bme_humidity_pct: this.params.moisture,
+          soil_density: this.params.density, reflection_depth: this.params.depth,
+          x: sec.cx * 2 + 12.5, y: sec.cz * 2 + 8.2
+        }));
       data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
-      data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+      data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
       data.total_targets = data.results.length;
     }
 
     this.detectionResult = data;
-    
+
     // Extract main parameters for display
     let pred, isHuman, prob, guidance, oxyHours, pal;
-    
+
     if (isBatch) {
       const humanResult = data.results.find(r => r.prediction === 1 || r.human_detected === true);
       pred = humanResult || data.results[0];
@@ -2386,9 +2379,9 @@ class TerraSenseApp {
       };
       oxyHours = guidance.estimated_oxygen_hours || 14.5;
       pal = survivalColor(oxyHours);
-      
+
       this._plotDynamicVictims(data.results);
-      
+
       const batchPanel = document.getElementById('batchSummaryPanel');
       const batchTitle = document.getElementById('batchSummaryTitle');
       const batchSubtitle = document.getElementById('batchSummarySubtitle');
@@ -2427,7 +2420,7 @@ class TerraSenseApp {
 
     // Gauge
     document.getElementById('probabilityVal').innerHTML = `${prob}<span class="probability-unit">%</span>`;
-    document.getElementById('gaugeProgress').style.strokeDashoffset = 565 - (prob/100)*565;
+    document.getElementById('gaugeProgress').style.strokeDashoffset = 565 - (prob / 100) * 565;
 
     let gpsText = "N/A - MATRIX CLEAR";
 
@@ -2487,16 +2480,16 @@ class TerraSenseApp {
     const gpsTextEl = document.getElementById('telemetryGpsText');
     if (gpsTextEl) gpsTextEl.textContent = gpsText;
 
-    document.getElementById('telemetryDepth').textContent      = `${this.params.depth.toFixed(2)} M`;
-    document.getElementById('telemetryVital').textContent      = `${(this.params.breathing*60).toFixed(0)} bpm / ${(this.params.heartbeat*60).toFixed(0)} bpm`;
-    document.getElementById('telemetrySnr').textContent        = `${this.params.snr.toFixed(1)} dB`;
+    document.getElementById('telemetryDepth').textContent = `${this.params.depth.toFixed(2)} M`;
+    document.getElementById('telemetryVital').textContent = `${(this.params.breathing * 60).toFixed(0)} bpm / ${(this.params.heartbeat * 60).toFixed(0)} bpm`;
+    document.getElementById('telemetrySnr').textContent = `${this.params.snr.toFixed(1)} dB`;
     document.getElementById('telemetryDielectric').textContent = `${this.params.dielectric.toFixed(1)} ε`;
 
     this.updateHarmonicsWave();
     this.updateDepthChart();
     this._updateSubsurfaceInspector(pred, isHuman, prob);
 
-    document.getElementById('chartInsightText').textContent = `Vitals: ${(this.params.breathing*60).toFixed(0)} breath / ${(this.params.heartbeat*60).toFixed(0)} pulse bpm — Oxygen ~${oxyHours.toFixed(1)} hrs`;
+    document.getElementById('chartInsightText').textContent = `Vitals: ${(this.params.breathing * 60).toFixed(0)} breath / ${(this.params.heartbeat * 60).toFixed(0)} pulse bpm — Oxygen ~${oxyHours.toFixed(1)} hrs`;
 
     document.getElementById('rescueAdvisoryContent').innerHTML = `
       <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:var(--radius-sm);padding:0.65rem 0.85rem;font-size:0.8rem;line-height:1.5;">
@@ -2507,44 +2500,44 @@ class TerraSenseApp {
     `;
 
     document.getElementById('reportConsoleBox').innerHTML = `
-      <div class="report-row"><span class="report-key">AI PREDICTION:</span> <span class="report-val">${isHuman?'HUMAN DETECTED':'CLEAR'} (${prob}%)</span></div>
-      <div class="report-row"><span class="report-key">BREATH RATE:</span>   <span class="report-val">${(this.params.breathing*60).toFixed(1)} bpm</span></div>
-      <div class="report-row"><span class="report-key">HEART RATE:</span>    <span class="report-val">${(this.params.heartbeat*60).toFixed(1)} bpm</span></div>
+      <div class="report-row"><span class="report-key">AI PREDICTION:</span> <span class="report-val">${isHuman ? 'HUMAN DETECTED' : 'CLEAR'} (${prob}%)</span></div>
+      <div class="report-row"><span class="report-key">BREATH RATE:</span>   <span class="report-val">${(this.params.breathing * 60).toFixed(1)} bpm</span></div>
+      <div class="report-row"><span class="report-key">HEART RATE:</span>    <span class="report-val">${(this.params.heartbeat * 60).toFixed(1)} bpm</span></div>
       <div class="report-row"><span class="report-key">SIGNAL:</span>         <span class="report-val" style="color:var(--accent-emerald)">TARGET LOCKED</span></div>
     `;
   }
 
   _updateSubsurfaceInspector(pred, isHuman, prob) {
-    const badgeEl     = document.getElementById('subsurfacePrecisionBadge');
-    const categoryEl  = document.getElementById('subsurfaceCategoryText');
-    const markerEl    = document.getElementById('buriedPersonMarker');
-    const depthText   = document.getElementById('buriedDepthText');
-    const postureEl   = document.getElementById('subsurfacePostureText');
-    const coordsEl    = document.getElementById('subsurfaceCoordsText');
-    const airVolEl    = document.getElementById('subsurfaceAirVolText');
-    const displaceEl  = document.getElementById('subsurfaceDisplaceText');
-    const attenEl     = document.getElementById('subsurfaceAttenText');
-    
+    const badgeEl = document.getElementById('subsurfacePrecisionBadge');
+    const categoryEl = document.getElementById('subsurfaceCategoryText');
+    const markerEl = document.getElementById('buriedPersonMarker');
+    const depthText = document.getElementById('buriedDepthText');
+    const postureEl = document.getElementById('subsurfacePostureText');
+    const coordsEl = document.getElementById('subsurfaceCoordsText');
+    const airVolEl = document.getElementById('subsurfaceAirVolText');
+    const displaceEl = document.getElementById('subsurfaceDisplaceText');
+    const attenEl = document.getElementById('subsurfaceAttenText');
+
     // Newly added elements
-    const probeLineEl   = document.getElementById('subsurfaceProbeLine');
+    const probeLineEl = document.getElementById('subsurfaceProbeLine');
     const targetAlertEl = document.getElementById('noTargetAlert');
-    const soilBadgeEl   = document.getElementById('soilStratumTypeBadge');
+    const soilBadgeEl = document.getElementById('soilStratumTypeBadge');
 
     if (!badgeEl) return;
 
     const depth = this.params.depth || 1.85;
     const precisionScore = pred?.precision_score || (isHuman ? 100.0 : 99.4);
     const category = pred?.detection_category || (isHuman ? "Live Trapped Victim (Active Vitals)" : "Clear Soil / Non-Human Matrix");
-    const locator  = pred?.subsurface_victim_locator || {};
-    const posture  = locator.body_posture || (isHuman ? "Supine in Subsurface Air Void" : "No Target Detected");
+    const locator = pred?.subsurface_victim_locator || {};
+    const posture = locator.body_posture || (isHuman ? "Supine in Subsurface Air Void" : "No Target Detected");
     const gridCoords = locator.grid_coordinates || { x: 14.2, y: 9.6, z: -depth };
-    const airVol    = locator.air_pocket_volume_m3 !== undefined ? locator.air_pocket_volume_m3 : (isHuman ? (2.8 - depth * 0.4).toFixed(2) : 0);
+    const airVol = locator.air_pocket_volume_m3 !== undefined ? locator.air_pocket_volume_m3 : (isHuman ? (2.8 - depth * 0.4).toFixed(2) : 0);
 
-    const vitals   = pred?.vital_doppler_diagnostics || {};
+    const vitals = pred?.vital_doppler_diagnostics || {};
     const displace = vitals.chest_displacement_mm !== undefined ? vitals.chest_displacement_mm : (isHuman ? (this.params.microamp * 4.5).toFixed(2) : 0);
 
-    const soilMat  = pred?.soil_stratum_matrix || {};
-    const atten    = soilMat.attenuation_db_m !== undefined ? soilMat.attenuation_db_m : (3.5 + (this.params.moisture * 0.18)).toFixed(1);
+    const soilMat = pred?.soil_stratum_matrix || {};
+    const atten = soilMat.attenuation_db_m !== undefined ? soilMat.attenuation_db_m : (3.5 + (this.params.moisture * 0.18)).toFixed(1);
     const soilType = soilMat.soil_stratum_type || (this.params.moisture > 45 ? "Wet Silty Clay (High Radar Attenuation)" : (this.params.moisture < 25 ? "Sandy Loam Matrix (Good Radar Penetration)" : "Compact Soil & Rubble Mix"));
 
     badgeEl.textContent = `PRECISION: ${precisionScore.toFixed(1)}%`;
@@ -2599,13 +2592,13 @@ class TerraSenseApp {
   _calculateClientPrediction(targetData = null) {
     const breathing = targetData ? targetData.breathing_hz : this.params.breathing;
     const heartbeat = targetData ? targetData.heartbeat_hz : this.params.heartbeat;
-    const microamp  = targetData ? targetData.micro_amp : this.params.microamp;
-    const snr       = targetData ? targetData.snr_db : this.params.snr;
-    const depth     = targetData ? targetData.reflection_depth : (this.params.depth || 1.85);
+    const microamp = targetData ? targetData.micro_amp : this.params.microamp;
+    const snr = targetData ? targetData.snr_db : this.params.snr;
+    const depth = targetData ? targetData.reflection_depth : (this.params.depth || 1.85);
     const dielectric = targetData ? targetData.dielectric_shift : (this.params.dielectric || 8.4);
-    const moisture   = targetData ? targetData.bme_humidity_pct : (this.params.moisture || 35.0);
-    const x         = targetData ? (targetData.x !== undefined ? targetData.x : 0) : 14.2;
-    const y         = targetData ? (targetData.y !== undefined ? targetData.y : 0) : 9.6;
+    const moisture = targetData ? targetData.bme_humidity_pct : (this.params.moisture || 35.0);
+    const x = targetData ? (targetData.x !== undefined ? targetData.x : 0) : 14.2;
+    const y = targetData ? (targetData.y !== undefined ? targetData.y : 0) : 9.6;
     // isHumanOverride was previously undeclared — fixed: evaluate purely from sensor readings
     const isHuman = (breathing >= 0.05 || heartbeat >= 0.30 || microamp >= 0.10 || (breathing > 0 && heartbeat > 0));
     let prob = 0;
@@ -2701,7 +2694,7 @@ class TerraSenseApp {
     if (!panel) return;
     panel.style.display = 'block';
     panel.style.borderColor = pal.str;
-    panel.style.background  = `rgba(${this._hexToRgb(pal.hex)},0.08)`;
+    panel.style.background = `rgba(${this._hexToRgb(pal.hex)},0.08)`;
 
     panel.innerHTML = `
       <!-- Title -->
@@ -2726,7 +2719,7 @@ class TerraSenseApp {
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;">
           <span style="font-family:var(--font-tech);font-size:0.7rem;color:#94a3b8;">TIME LEFT</span>
-          <span id="oxyCountdownMain" style="font-family:var(--font-mono);font-size:1.15rem;font-weight:700;color:${pal.str};letter-spacing:1px;">${this._fmtSeconds(Math.round(oxyHours*3600))}</span>
+          <span id="oxyCountdownMain" style="font-family:var(--font-mono);font-size:1.15rem;font-weight:700;color:${pal.str};letter-spacing:1px;">${this._fmtSeconds(Math.round(oxyHours * 3600))}</span>
         </div>
       </div>
 
@@ -2738,11 +2731,11 @@ class TerraSenseApp {
         </div>
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-sm);padding:0.4rem;text-align:center;">
           <div style="font-family:var(--font-tech);font-size:0.6rem;color:#64748b;font-weight:700;">HEARTBEAT</div>
-          <div style="font-family:var(--font-mono);font-size:0.85rem;color:#f43f5e;font-weight:700;">${(this.params.heartbeat*60).toFixed(0)} bpm</div>
+          <div style="font-family:var(--font-mono);font-size:0.85rem;color:#f43f5e;font-weight:700;">${(this.params.heartbeat * 60).toFixed(0)} bpm</div>
         </div>
         <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-sm);padding:0.4rem;text-align:center;">
           <div style="font-family:var(--font-tech);font-size:0.6rem;color:#64748b;font-weight:700;">BREATHING</div>
-          <div style="font-family:var(--font-mono);font-size:0.85rem;color:#00f2fe;font-weight:700;">${(this.params.breathing*60).toFixed(0)} bpm</div>
+          <div style="font-family:var(--font-mono);font-size:0.85rem;color:#00f2fe;font-weight:700;">${(this.params.breathing * 60).toFixed(0)} bpm</div>
         </div>
       </div>
 
@@ -2761,8 +2754,8 @@ class TerraSenseApp {
   }
 
   _fmtSeconds(s) {
-    const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -2785,7 +2778,7 @@ class TerraSenseApp {
     } catch (e) {
       console.warn('Failed fetching sample CSV via network, using offline fallback:', e);
     }
-    
+
     // Inlined robust fallback dataset to ensure "Run Test Demo Scan" works 100% offline or on local file:// opens
     const fallbackCsv = `depth_m,signal_amplitude_mv,doppler_freq_hz,dielectric_permittivity,moisture_pct,density_kg_m3
 0.0,98.2,0.0,6.5,28.0,1750
@@ -2920,21 +2913,21 @@ class TerraSenseApp {
   // ═══════════════════════════════════════════════════════════════
   startEspTelemetryPolling() {
     if (this.espPollInterval) return;
-    
+
     const toggle = document.getElementById('espTelemetryToggle');
     if (toggle) toggle.checked = true;
 
     const toggleText = document.getElementById('espToggleText');
     if (toggleText) toggleText.textContent = "POLLING...";
-    
+
     // Poll instantly
     this.pollTelemetry();
-    
+
     // Poll every 1.5 seconds
     this.espPollInterval = setInterval(() => {
       this.pollTelemetry();
     }, 1500);
-    
+
     this.playBeep(650, 0.1);
   }
 
@@ -2943,7 +2936,7 @@ class TerraSenseApp {
       clearInterval(this.espPollInterval);
       this.espPollInterval = null;
     }
-    
+
     const toggle = document.getElementById('espTelemetryToggle');
     if (toggle) toggle.checked = false;
 
@@ -2954,7 +2947,7 @@ class TerraSenseApp {
     }
     const toggleText = document.getElementById('espToggleText');
     if (toggleText) toggleText.textContent = "OFFLINE";
-    
+
     // Reset reading displays
     document.getElementById('espPir').textContent = "--";
     document.getElementById('espPir').style.color = "";
@@ -2964,7 +2957,7 @@ class TerraSenseApp {
     document.getElementById('espRadarDist').textContent = "--";
     document.getElementById('espTemp').textContent = "--";
     document.getElementById('espHumid').textContent = "--";
-    
+
     this.playBeep(400, 0.1);
   }
 
@@ -2977,7 +2970,7 @@ class TerraSenseApp {
         const led = document.getElementById('espLed');
         const toggleText = document.getElementById('espToggleText');
         const statusEl = document.getElementById('headerArrayStatus');
-        
+
         if (data.active) {
           this.isEspActive = true;
           this.isFileLoaded = false;
@@ -2991,28 +2984,28 @@ class TerraSenseApp {
             led.style.background = "#10b981";
           }
           if (toggleText) toggleText.textContent = "ONLINE";
-          
+
           // Update details panel
           if (document.getElementById('espPir')) {
             document.getElementById('espPir').textContent = data.pir_motion === 1 ? "ACTIVE" : "CLEAR";
             document.getElementById('espPir').style.color = data.pir_motion === 1 ? "#ef4444" : "#10b981";
           }
-          
+
           if (document.getElementById('espRssi')) {
             document.getElementById('espRssi').textContent = `${data.wifi_rssi || 0} dBm`;
           }
-          
+
           let radarStateStr = "CLEAR";
           const rState = (data.radar_raw && data.radar_raw.state) ? data.radar_raw.state : 0;
           if (rState === 1) radarStateStr = "MOVING";
           else if (rState === 2) radarStateStr = "STATIC";
           else if (rState === 3) radarStateStr = "BOTH";
-          
+
           if (document.getElementById('espRadarState')) {
             document.getElementById('espRadarState').textContent = radarStateStr;
             document.getElementById('espRadarState').style.color = rState > 0 ? "#ef4444" : "#10b981";
           }
-          
+
           if (document.getElementById('espRadarDist')) {
             const rDist = (data.radar_raw && data.radar_raw.distance_cm) ? (data.radar_raw.distance_cm / 100.0) : 0;
             document.getElementById('espRadarDist').textContent = `${rDist.toFixed(2)} M`;
@@ -3024,7 +3017,7 @@ class TerraSenseApp {
           if (document.getElementById('espHumid') && data.environment_raw) {
             document.getElementById('espHumid').textContent = `${(data.environment_raw.humidity_pct || 45).toFixed(1)}%`;
           }
-          
+
           // Sync with ML input parameters
           if (data.ml_inputs) {
             this.params.breathing = parseFloat(data.ml_inputs.breathing_hz);
@@ -3035,12 +3028,12 @@ class TerraSenseApp {
             this.params.moisture = parseFloat(data.ml_inputs.soil_moisture);
             this.params.density = parseFloat(data.ml_inputs.soil_density);
             this.params.dielectric = parseFloat(data.ml_inputs.dielectric_shift);
-            
+
             // Sync slider display elements
             if (this.syncUIFromParams) {
               this.syncUIFromParams();
             }
-            
+
             // Run prediction and redraw charts silently
             this.runLiveUpdate();
           }
@@ -3056,7 +3049,7 @@ class TerraSenseApp {
             led.style.background = "#eab308"; // Amber warning
           }
           if (toggleText) toggleText.textContent = "STALE (NO ESP)";
-          
+
           // Gray out readings
           document.getElementById('espPir').textContent = "--";
           document.getElementById('espPir').style.color = "";
@@ -3077,7 +3070,7 @@ class TerraSenseApp {
       const led = document.getElementById('espLed');
       if (led) {
         led.className = "pulse-telemetry-led led-pulse-inactive";
-        led.style.background = "#ef4444"; 
+        led.style.background = "#ef4444";
       }
       const toggleText = document.getElementById('espToggleText');
       if (toggleText) toggleText.textContent = "CONN ERROR";
@@ -3110,20 +3103,20 @@ class TerraSenseApp {
     try {
       // Live ESP32 update: scan all 4 sectors independently so human_count is dynamic
       const targets = SECTORS.map(sec => ({
-        breathing_hz:     Math.max(0, this.params.breathing  + (Math.random() - 0.5) * 0.03),
-        heartbeat_hz:     Math.max(0, this.params.heartbeat  + (Math.random() - 0.5) * 0.06),
-        micro_amp:        Math.max(0, this.params.microamp   + (Math.random() - 0.5) * 0.04),
-        snr_db:           this.params.snr        + (Math.random() - 0.5) * 2.0,
+        breathing_hz: Math.max(0, this.params.breathing + (Math.random() - 0.5) * 0.03),
+        heartbeat_hz: Math.max(0, this.params.heartbeat + (Math.random() - 0.5) * 0.06),
+        micro_amp: Math.max(0, this.params.microamp + (Math.random() - 0.5) * 0.04),
+        snr_db: this.params.snr + (Math.random() - 0.5) * 2.0,
         dielectric_shift: this.params.dielectric + (Math.random() - 0.5) * 0.5,
-        bme_humidity_pct: this.params.moisture   + (Math.random() - 0.5) * 4.0,
-        soil_density:     this.params.density,
+        bme_humidity_pct: this.params.moisture + (Math.random() - 0.5) * 4.0,
+        soil_density: this.params.density,
         reflection_depth: Math.max(0.1, this.params.depth + (Math.random() - 0.5) * 0.3),
         x: sec.cx * 2 + 12.5,
         y: sec.cz * 2 + 8.2
       }));
 
       const liveApiPath = this._predictApiPath();
-      const liveBody    = this._addFusionFields({ targets });
+      const liveBody = this._addFusionFields({ targets });
       const res = await fetch(this.getApiUrl(liveApiPath), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(liveBody)
@@ -3133,7 +3126,7 @@ class TerraSenseApp {
         if (data.fusion_applied) console.info('[TERRA-SENSE] Vision fusion applied on live update — camera weight 30%');
       } else {
         data = { status: 'success', results: targets.map(t => this._calculateClientPrediction(t).result) };
-        data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+        data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
         data.total_targets = data.results.length;
       }
     } catch (e) {
@@ -3146,16 +3139,16 @@ class TerraSenseApp {
         x: sec.cx * 2 + 12.5, y: sec.cz * 2 + 8.2
       }));
       data = { status: 'success', results: fbTargets.map(t => this._calculateClientPrediction(t).result) };
-      data.human_count   = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
+      data.human_count = data.results.filter(r => r.prediction === 1 || r.human_detected === true).length;
       data.total_targets = data.results.length;
     }
 
     this.detectionResult = data;
     // Treat live update result as batch — pick the worst-case (most critical) human result
     const humanResults = (data.results || []).filter(r => r.prediction === 1 || r.human_detected === true);
-    const pred  = humanResults.length > 0 ? humanResults[0] : (data.results ? data.results[0] : data.result);
+    const pred = humanResults.length > 0 ? humanResults[0] : (data.results ? data.results[0] : data.result);
     const isHuman = data.human_count > 0;
-    const prob    = pred.consensus_probability_pct !== undefined ? pred.consensus_probability_pct : (pred.probability_percentage || 85.0);
+    const prob = pred.consensus_probability_pct !== undefined ? pred.consensus_probability_pct : (pred.probability_percentage || 85.0);
     const guidance = pred.rescue_guidance || {
       urgency_level: "CRITICAL — Structural Support Required",
       rescue_strategy: "Medium Rubble: Hydraulic Trench Shield & Micro-Tunnel Probe",
@@ -3163,14 +3156,14 @@ class TerraSenseApp {
       air_permeability_pct: 28
     };
     const oxyHours = guidance.estimated_oxygen_hours || 14.5;
-    const pal     = survivalColor(oxyHours);
+    const pal = survivalColor(oxyHours);
 
     // Gauge
     const probValEl = document.getElementById('probabilityVal');
     if (probValEl) probValEl.innerHTML = `${prob}<span class="probability-unit">%</span>`;
-    
+
     const gaugeProgEl = document.getElementById('gaugeProgress');
-    if (gaugeProgEl) gaugeProgEl.style.strokeDashoffset = 565 - (prob/100)*565;
+    if (gaugeProgEl) gaugeProgEl.style.strokeDashoffset = 565 - (prob / 100) * 565;
 
     const banner = document.getElementById('detectionBanner');
 
@@ -3239,21 +3232,21 @@ class TerraSenseApp {
 
     const depthEl = document.getElementById('telemetryDepth');
     if (depthEl) depthEl.textContent = `${this.params.depth.toFixed(2)} M`;
-    
+
     const vitalEl = document.getElementById('telemetryVital');
-    if (vitalEl) vitalEl.textContent = `${(this.params.breathing*60).toFixed(0)} bpm / ${(this.params.heartbeat*60).toFixed(0)} bpm`;
-    
+    if (vitalEl) vitalEl.textContent = `${(this.params.breathing * 60).toFixed(0)} bpm / ${(this.params.heartbeat * 60).toFixed(0)} bpm`;
+
     const snrEl = document.getElementById('telemetrySnr');
     if (snrEl) snrEl.textContent = `${this.params.snr.toFixed(1)} dB`;
-    
+
     const dielEl = document.getElementById('telemetryDielectric');
     if (dielEl) dielEl.textContent = `${this.params.dielectric.toFixed(1)} ε`;
 
     this.updateHarmonicsWave();
     this.updateDepthChart();
-    
+
     const insightEl = document.getElementById('chartInsightText');
-    if (insightEl) insightEl.textContent = `Vitals: ${(this.params.breathing*60).toFixed(0)} breath / ${(this.params.heartbeat*60).toFixed(0)} pulse bpm — Oxygen ~${oxyHours.toFixed(1)} hrs`;
+    if (insightEl) insightEl.textContent = `Vitals: ${(this.params.breathing * 60).toFixed(0)} breath / ${(this.params.heartbeat * 60).toFixed(0)} pulse bpm — Oxygen ~${oxyHours.toFixed(1)} hrs`;
 
     const advisoryEl = document.getElementById('rescueAdvisoryContent');
     if (advisoryEl) {
@@ -3269,9 +3262,9 @@ class TerraSenseApp {
     const reportBox = document.getElementById('reportConsoleBox');
     if (reportBox) {
       reportBox.innerHTML = `
-        <div class="report-row"><span class="report-key">AI PREDICTION:</span> <span class="report-val">${isHuman?'HUMAN DETECTED':'CLEAR'} (${prob}%)</span></div>
-        <div class="report-row"><span class="report-key">BREATH RATE:</span>   <span class="report-val">${(this.params.breathing*60).toFixed(1)} bpm</span></div>
-        <div class="report-row"><span class="report-key">HEART RATE:</span>    <span class="report-val">${(this.params.heartbeat*60).toFixed(1)} bpm</span></div>
+        <div class="report-row"><span class="report-key">AI PREDICTION:</span> <span class="report-val">${isHuman ? 'HUMAN DETECTED' : 'CLEAR'} (${prob}%)</span></div>
+        <div class="report-row"><span class="report-key">BREATH RATE:</span>   <span class="report-val">${(this.params.breathing * 60).toFixed(1)} bpm</span></div>
+        <div class="report-row"><span class="report-key">HEART RATE:</span>    <span class="report-val">${(this.params.heartbeat * 60).toFixed(1)} bpm</span></div>
         <div class="report-row"><span class="report-key">SIGNAL:</span>         <span class="report-val" style="color:var(--accent-emerald)">TARGET LOCKED</span></div>
       `;
     }
