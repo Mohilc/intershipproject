@@ -125,6 +125,51 @@ flowchart LR
 | **3** | **🧠 Multi-Modal AI Fusion** | • **6-Model Ensemble** (GBM, RF, ET, AdaBoost, MLP, KNN) cross-validates vital signs.<br>• **YOLOv8** identifies surface human silhouettes.<br>• **Fusion Engine** merges subsurface radar confidence (70%) with optical vision (30%).<br>• **NVIDIA StreamPETR** calculates victim posture, depth, and drill angles. | Fused Detection Confidence, Posture, Depth & Drill Vector |
 | **4** | **🛸 Tactical Visualisation & Rescue Action** | • **3D WebGL Scene** renders the victim's location in 3D soil strata with sub-cm GPS coordinates.<br>• **Audio HUD** sounds proximity chimes upon target acquisition.<br>• **Survival Engine** calculates oxygen countdown and generates printable PDF rescue reports. | Actionable 3D Map, Audio Alerts & PDF Rescue Orders |
 
+### 🌊 Detailed Lifecycle of a Subsurface Detection
+
+To understand how TerraSense AI bridges the gap between raw physical phenomena and actionable tactical displays, consider the following lifecycle of a survivor buried 3 meters under clay soil:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Survivor as Survivor (Subsurface)
+    participant Sensors as Edge Node (ESP32 / Rd-61 / BME690)
+    participant Server as Flask Core Server (server.py)
+    participant ML as 6-Model AI Engine (ml_model.py)
+    participant NIM as NVIDIA StreamPETR (streampetr_3d.py)
+    participant UI as Command Dashboard (Three.js WebGL)
+    actor Operator as SAR Operator / Commander
+
+    Survivor->>Sensors: Emits cardiac pulse (1.15Hz) & respiration (0.28Hz)
+    Sensors->>Sensors: Rd-61 Radar detects chest displacement (0.005mm)
+    Sensors->>Sensors: BME690 measures gas resistance (exhalation anomaly)
+    Sensors->>Server: HTTP GET /api/telemetry (JSON payload)
+    Server->>ML: Dispatches 12-channel normalized sensor vector
+    ML->>ML: Trains/evaluates ensemble models (GBM, RF, ET, Ada, MLP, KNN)
+    ML->>Server: Consensus probability report (e.g. 98.6% Live Human)
+    Server->>NIM: Evaluates vitals + depth via LLM-based 3D posturizer
+    NIM->>Server: Returns posturisation model, entrapment type & drill entry vectors
+    Server->>UI: Fuses data & maps via Cosine GPS math
+    UI->>Operator: Sounds target lock alert buzzer
+    UI->>Operator: Visualizes 3D soil strata, vital waveform & drone scan cone
+```
+
+1. **Edge Sampling & Signal Acquisition**:
+   - The **Ai-Thinker Rd-61 Radar** emits high-frequency 60GHz millimeter-wave signals. When they bounce off the survivor's chest cavity, micro-displacement (chest wall moving due to heartbeats or breathing) shifts the phase of the reflected wave.
+   - Simultaneously, the **BME690 environmental sensor** detects microscopic increases in ambient gas concentrations (methane/CO2) escaping through the soil voids.
+
+2. **Zero-Latency Ingestion**:
+   - The primary ESP32 parses these analog and digital signals, formats them into a clean JSON string, and hosts it at `http://192.168.4.1/api/telemetry`.
+   - The Flask gateway, running on a command squad laptop, queries this API in a continuous loop, parsing the telemetry into a structured 12-dimensional array.
+
+3. **Multi-Model Consensus & NVIDIA NIM Reasoning**:
+   - The normalized 12-channel vector is fed into the **6-Model Machine Learning Ensemble** inside [ml_model.py](file:///c:/Users/mohilc/OneDrive/Desktop/plkd1/ml_model.py). The models soft-vote, outputting a consensus confidence score.
+   - If human presence is verified, the system feeds the vital waveforms and depth coefficients to **NVIDIA StreamPETR** via the NIM API. The NIM reasons over the posture (`Supine`, `Fetal`, `Prone`) and entrapment obstacle parameters.
+
+4. **Tactical Action & 3D Visualization**:
+   - The **Cosine Geolocation Formula** converts the relative local coordinates into absolute GPS coordinates.
+   - The [Three.js 3D Viewport](file:///c:/Users/mohilc/OneDrive/Desktop/plkd1/index.html) immediately animates a pulsing red survivor mesh beneath the clay stratum layer, locks on with a visual camera reticle, sounds a warning buzzer, and initiates the oxygen countdown.
+
 ---
 
 ## 🎯 Overview & Mission
