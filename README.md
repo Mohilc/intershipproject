@@ -10,7 +10,7 @@
 [![ML Models](https://img.shields.io/badge/AI%20Ensemble-6%20Models-orange?logo=scikit-learn)](https://scikit-learn.org/)
 [![NVIDIA AI](https://img.shields.io/badge/NVIDIA%20NIM-StreamPETR%203D-76B900?logo=nvidia)](https://build.nvidia.com)
 [![ESP32 CAM](https://img.shields.io/badge/ESP32--CAM-Live%20Optical%20Feed-red?logo=espressif)](https://www.espressif.com/)
-[![Precision](https://img.shields.io/badge/Detection%20Precision-100%25-brightgreen)](#-machine-learning-consensus-engine)
+[![Precision](https://img.shields.io/badge/Detection%20Precision-100%25-brightgreen)](#-6-model-ai-consensus-ensemble-ml_modelpy)
 [![License](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
 
 *Locate, geolocate, and rescue survivors trapped under soil, debris, and structural rubble in real time.*
@@ -45,7 +45,7 @@ To optimize low-latency tactical performance and network reliability in real-wor
 │   1. EDGE HARDWARE & SENSORS    │       │   2. SERVER & AI CORE ENGINES   │       │   3. TACTICAL COMMAND DASHBOARD │
 ├─────────────────────────────────┤       ├─────────────────────────────────┤       ├─────────────────────────────────┤
 │ • Sensor ESP32 (192.168.4.1 AP) │       │ • Flask REST Gateway (server.py)│       │ • Interactive Three.js 3D Grid  │
-│   ├── 24GHz Doppler Radar       │       │   ├── LRU Cache & Multi-worker  │       │   ├── Orbiting SAR Drone Cam    │
+│   ├── Ai-Thinker Rd-61 Radar    │       │   ├── LRU Cache & Multi-worker  │       │   ├── Orbiting SAR Drone Cam    │
 │   ├── BME690 Gas/Temp/Pres/Hum  │       │   ├── MJPEG Stream Proxy        │       │   ├── Soil Strata (0m - 5m)     │
 │   ├── PIR HC-SR501 Motion       │       │   └── Real-time Telemetry Proxy │       │   └── 3D Target Meshes & Sprites│
 │   └── Wi-Fi Hotspot Host        │       │                                 │       │                                 │
@@ -65,60 +65,65 @@ To optimize low-latency tactical performance and network reliability in real-wor
 
 ---
 
-## 🔄 End-to-End System Workflow
+## 🔄 How TerraSense AI Works: End-to-End Workflow
 
 ```mermaid
-flowchart TD
-    %% Custom Styles Definition
-    classDef stage1 fill:#0f172a,stroke:#00f2fe,stroke-width:2px,color:#e2e8f0;
-    classDef stage2 fill:#1e1b4b,stroke:#f59e0b,stroke-width:2px,color:#e2e8f0;
-    classDef stage3 fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#e2e8f0;
-    classDef stage4 fill:#311042,stroke:#a855f7,stroke-width:2px,color:#e2e8f0;
+flowchart LR
+    %% Custom Styling
+    classDef input fill:#0f172a,stroke:#00f2fe,stroke-width:2px,color:#fff;
+    classDef process fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#fff;
+    classDef ai fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff;
+    classDef output fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#fff;
 
-    subgraph SG1 ["📡 STAGE 1: EDGE SENSORS & DATA INPUTS"]
-        A1["📡 ESP32 Sensor AP Node<br>(192.168.4.1)<br>• 24GHz Doppler Radar Sensor<br>• BME690 Environmental Gas Sensor<br>• PIR Motion Detector HC-SR501"]:::stage1
-        A2["📷 ESP32-CAM Client Node<br>(192.168.4.2)<br>• OV2640 Live Stream (/stream)<br>• Onboard Flash LED Spotlight (/led)"]:::stage1
-        A3["💻 PC Local USB Webcam<br>• cv2.VideoCapture(0) Feed<br>• Local DirectShow failover"]:::stage1
-        A4[("📂 Field Survey CSV Scan<br>• GPR Soil Permittivity readings<br>• Multi-row scan logging")]:::stage1
+    subgraph P1 ["📡 STEP 1: EDGE SENSING"]
+        direction TB
+        S1["📡 Sensor Node (ESP32)<br>• Ai-Thinker Rd-61 Radar<br>• BME690 (Gas/Temp/Pres)<br>• PIR Motion Sensor"]:::input
+        S2["📷 Camera Node (ESP32-CAM)<br>• Live Optical Stream<br>• Flash Spotlight"]:::input
     end
 
-    subgraph SG2 ["⚡ STAGE 2: PROCESSING & PROXY GATEWAY"]
-        B1(["🌐 Hotspot Mesh Network<br>SSID: TERRA-SENSE-ESP32<br>• Local station IP leasing"]):::stage2
-        B2{{"⚙️ Flask REST Core Server<br>(Port 3000 / server.py)<br>• CORS Proxy Tunneling Gateway<br>• 12-Channel Input Normalization<br>• LRU Prediction Caching"}}:::stage2
-        B3(["🎥 Zero-Lag MJPEG Stream Engine<br>• Async YOLO worker queue<br>• Auto Frame-Skipping Buffer"]):::stage2
+    subgraph P2 ["⚡ STEP 2: GATEWAY INGESTION"]
+        direction TB
+        G1["🌐 AP Hotspot (192.168.4.1)<br>Zero-Internet Local Mesh"]:::process
+        G2["⚙️ Flask Gateway (:3000)<br>• 12-Channel Normalizer<br>• Real-Time Video Buffer"]:::process
     end
 
-    subgraph SG3 ["🧠 STAGE 3: MULTI-MODAL AI COGNITION"]
-        C1("🧠 6-Model ML Ensemble<br>(ml_model.py)<br>• Soft-voting Consensus<br>• 100% Subsurface Precision"):::stage3
-        C2("👁️ YOLOv8 & OpenCV Human Vision<br>• person tracking class[0]<br>• Async background inference<br>• OpenCV HOG fallback"):::stage3
-        C3("🛰️ Vision-Sensor Fusion Engine<br>• 70% Subsurface Radar Classifier<br>• 30% Optical Vision Confidence"):::stage3
-        C4("📐 NVIDIA StreamPETR 3D<br>• Victim 3D Posture Estimation<br>• Drill entry angle vectors"):::stage3
+    subgraph P3 ["🧠 STEP 3: AI FUSION & ANALYSIS"]
+        direction TB
+        AI1["🧬 6-Model ML Ensemble<br>100% Subsurface Detection"]:::ai
+        AI2["👁️ YOLOv8 Optical AI<br>Real-Time Human Tracking"]:::ai
+        AI3["🛰️ Sensor-Vision Fusion<br>70% Radar + 30% Optical"]:::ai
+        AI4["📐 NVIDIA 3D Spatial AI<br>Posture & Drill Vectors"]:::ai
     end
 
-    subgraph SG4 ["🛸 STAGE 4: TACTICAL COMMAND DASHBOARD"]
-        D1["🛸 Three.js 3D WebGL Matrix<br>• Orbiting drone & spot beam<br>• Sub-cm Target GPS Sprites"]:::stage4
-        D2["🛡️ Real-Time Optical HUD<br>• Live feed & Reticle box<br>• Target acquire audio buzzer"]:::stage4
-        D3["📊 Bio-Diagnostics & Metrics<br>• Pulse Oscilloscope graph<br>• Oxygen survival timer"]:::stage4
-        D4[("📋 Mission Report Exporter<br>• Tactical Action JSON Logs<br>• Printable Rescue PDF Report")]:::stage4
+    subgraph P4 ["🛸 STEP 4: TACTICAL RESCUE HUD"]
+        direction TB
+        O1["🌐 3D WebGL Soil Matrix<br>Sub-cm GPS Pinpoints"]:::output
+        O2["🛡️ Live Optical HUD<br>Target Lock Audio Chime"]:::output
+        O3["⏱️ Oxygen Survival Clock<br>PDF Mission Exporter"]:::output
     end
 
-    %% Flow Connections with Styling
-    A1 ==>|WiFi HTTP GET /api/telemetry| B1
-    A2 ==>|MJPEG video stream| B1
-    A3 -->|Webcam raw frame buffer| B2
-    A4 -->|Multipart file upload| B2
-    B1 ==>|Routing interface| B2
-    B2 ==>|Push frames to worker| B3
-    B3 ==>|Async queue frames| C2
-    B2 -->|Input sensor vectors| C1
-    C1 -->|Radar bio prediction| C3
-    C2 -->|YOLO target conf| C3
-    C1 -->|Spatial anomaly coords| C4
-    C3 ==>|Fused target vector| D1
-    C2 ==>|Annotated frame stream| D2
-    C4 ==>|Entrapment metrics| D3
-    D1 & D2 & D3 ==>|Export action logs| D4
+    %% Pipeline Connections
+    S1 -->|Telemetry JSON| G1
+    S2 -->|MJPEG Stream| G1
+    G1 --> G2
+    G2 -->|Sensor Vector| AI1
+    G2 -->|Video Frames| AI2
+    AI1 --> AI3
+    AI2 --> AI3
+    AI1 --> AI4
+    AI3 --> O1
+    AI2 --> O2
+    AI4 --> O3
 ```
+
+### 📋 4-Step Operational Breakdown
+
+| Stage | Operation | What Happens | Key Output |
+|:---:|:---|:---|:---|
+| **1** | **📡 Multi-Sensor Edge Capture** | • **Ai-Thinker Rd-61 Radar** detects subsurface micro-movements (breathing/heartbeat).<br>• **BME690** detects gas resistance shifts and body heat in subterranean voids.<br>• **ESP32-CAM** streams optical footage of rubble and entry points. | Raw Telemetry Packets & Live MJPEG Video |
+| **2** | **⚡ Gateway Ingestion & Routing** | • ESP32 AP broadcasts a zero-internet local WiFi hotspot (`TERRA-SENSE-ESP32`).<br>• Flask backend cleans, validates, and normalizes telemetry into 12 distinct feature vectors.<br>• Async background worker queues camera frames without frame drops. | Normalized 12-D Sensor Vector & Stream Buffer |
+| **3** | **🧠 Multi-Modal AI Fusion** | • **6-Model Ensemble** (GBM, RF, ET, AdaBoost, MLP, KNN) cross-validates vital signs.<br>• **YOLOv8** identifies surface human silhouettes.<br>• **Fusion Engine** merges subsurface radar confidence (70%) with optical vision (30%).<br>• **NVIDIA StreamPETR** calculates victim posture, depth, and drill angles. | Fused Detection Confidence, Posture, Depth & Drill Vector |
+| **4** | **🛸 Tactical Visualisation & Rescue Action** | • **3D WebGL Scene** renders the victim's location in 3D soil strata with sub-cm GPS coordinates.<br>• **Audio HUD** sounds proximity chimes upon target acquisition.<br>• **Survival Engine** calculates oxygen countdown and generates printable PDF rescue reports. | Actionable 3D Map, Audio Alerts & PDF Rescue Orders |
 
 ---
 
@@ -143,6 +148,7 @@ By fusing **multi-sensor edge telemetry**, **high-definition optical camera stre
 ### 1. 📡 Edge Hardware Telemetry Node (`esp32_firmware/esp32_firmware.ino`)
 The primary microcontroller node collects physical sensor measurements and **hosts the standalone WiFi network**:
 - **WiFi Access Point**: Creates a local WiFi hotspot (`TERRA-SENSE-ESP32`, password: `1234567890`) that connects the ESP32-CAM and command laptops without requiring external internet.
+- **Ai-Thinker Rd-61 Radar Module**: 60GHz FMCW millimeter-wave radar for high-precision, non-contact micro-displacement detection (respiration rate, heartbeat rhythm, and micro-motion).
 - **BME690 Environmental Sensor** (I2C on GPIO 21/22): Measures atmospheric pressure, ambient temperature, relative humidity, and volatile organic gas resistance to detect survivor exhalation pockets.
 - **PIR Motion Sensor (`HC-SR501`)** (GPIO 14): Detects passive infrared shifts and thermal radiation through voids.
 - **Web Server**: Serves live JSON telemetry at `http://192.168.4.1/api/telemetry` and an onboard sensor dashboard at `http://192.168.4.1/`.
@@ -206,7 +212,7 @@ Built with Three.js WebGL:
 | 🛸 **NVIDIA StreamPETR 3D** | Spatial AI | 3D posture reasoning, obstacle analysis, and drill entry vectors |
 | 📷 **ESP32-CAM Live Feed** | Optical Video | High-framerate MJPEG stream, snapshot capture, and flash LED |
 | 💻 **PC Webcam Streaming** | Optical Video | Local `/dev/video0` DirectShow streaming for rapid indoor testing |
-| 🌊 **24GHz Doppler Radar** | RF Sensors | Non-contact micro-displacement detection for pulse and breath |
+| 🌊 **Ai-Thinker Rd-61 Radar** | RF Sensors | 60GHz FMCW non-contact micro-displacement detection for pulse and breath |
 | 🌡️ **BME690 Environmental** | Edge Sensor | Gas resistance, barometric pressure, temperature, and humidity |
 | 🌐 **3D Three.js Visualizer** | WebGL | 4-quadrant subsurface matrix with orbiting drone and GPS sprites |
 | 📍 **Cosine GPS Geolocation** | Mathematics | Sub-centimetre latitude and longitude trigonometric conversion |
@@ -340,6 +346,8 @@ Open `http://localhost:3000` in your web browser.
 ### ESP32 Sensor Node Wiring
 | Sensor | Sensor Pin | ESP32 GPIO | Description |
 |---|---|---|---|
+| **Ai-Thinker Rd-61** | TX / RX | GPIO 16 / 17 (UART) | Radar telemetry data stream |
+| **Ai-Thinker Rd-61** | VCC & GND | 3.3V / 5V & GND | Power supply & common ground |
 | **PIR HC-SR501** | OUT | GPIO 14 | Digital motion trigger |
 | **BME690** | SDA | GPIO 21 | I2C Data line |
 | **BME690** | SCL | GPIO 22 | I2C Clock line |
