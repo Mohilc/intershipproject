@@ -68,7 +68,7 @@ To optimize low-latency tactical performance and network reliability in real-wor
 ## 🔄 How TerraSense AI Works: End-to-End Workflow
 
 ```mermaid
-flowchart LR
+flowchart TB
     %% Custom Styling
     classDef input fill:#0f172a,stroke:#00f2fe,stroke-width:2px,color:#fff;
     classDef process fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#fff;
@@ -76,30 +76,37 @@ flowchart LR
     classDef output fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#fff;
 
     subgraph P1 ["📡 STEP 1: EDGE SENSING"]
-        direction TB
-        S1["📡 Sensor Node (ESP32)<br>• Ai-Thinker Rd-61 Radar<br>• BME690 (Gas/Temp/Pres)<br>• PIR Motion Sensor"]:::input
+        direction LR
+        S1["📡 Sensor Node (ESP32)<br>• Ai-Thinker Rd-61 Radar<br>• BME690 & PIR Sensors"]:::input
         S2["📷 Camera Node (ESP32-CAM)<br>• Live Optical Stream<br>• Flash Spotlight"]:::input
     end
 
     subgraph P2 ["⚡ STEP 2: GATEWAY INGESTION"]
-        direction TB
-        G1["🌐 AP Hotspot (192.168.4.1)<br>Zero-Internet Local Mesh"]:::process
-        G2["⚙️ Flask Gateway (:3000)<br>• 12-Channel Normalizer<br>• Real-Time Video Buffer"]:::process
+        direction LR
+        G1["🌐 Local WiFi AP Hotspot<br>(SSID: TERRA-SENSE-ESP32)"]:::process
+        G2["⚙️ Flask REST Gateway<br>• 12-Channel Normalizer<br>• Real-Time Video Proxy"]:::process
     end
 
     subgraph P3 ["🧠 STEP 3: AI FUSION & ANALYSIS"]
         direction TB
-        AI1["🧬 6-Model ML Ensemble<br>100% Subsurface Detection"]:::ai
-        AI2["👁️ YOLOv8 Optical AI<br>Real-Time Human Tracking"]:::ai
-        AI3["🛰️ Sensor-Vision Fusion<br>70% Radar + 30% Optical"]:::ai
-        AI4["📐 NVIDIA 3D Spatial AI<br>Posture & Drill Vectors"]:::ai
+        subgraph P3_A ["AI Core Engines"]
+            direction LR
+            AI1["🧬 6-Model ML Ensemble<br>Subsurface Bio-Detection"]:::ai
+            AI2["👁️ YOLOv8 Vision AI<br>Optical Person Detection"]:::ai
+        end
+        subgraph P3_B ["Decision Core"]
+            direction LR
+            AI3["🛰️ Sensor-Vision Fusion<br>70% Radar + 30% Optical"]:::ai
+            AI4["📐 NVIDIA 3D Spatial AI<br>Victim Posture & Drill Vectors"]:::ai
+        end
+        P3_A ====> P3_B
     end
 
     subgraph P4 ["🛸 STEP 4: TACTICAL RESCUE HUD"]
-        direction TB
-        O1["🌐 3D WebGL Soil Matrix<br>Sub-cm GPS Pinpoints"]:::output
-        O2["🛡️ Live Optical HUD<br>Target Lock Audio Chime"]:::output
-        O3["⏱️ Oxygen Survival Clock<br>PDF Mission Exporter"]:::output
+        direction LR
+        O1["🌐 3D WebGL Matrix<br>Sub-cm Target GPS Sprites"]:::output
+        O2["🛡️ Live Optical HUD<br>Target Lock Audio Buzzer"]:::output
+        O3["📋 Mission Exporter<br>PDF & JSON Reports"]:::output
     end
 
     %% Pipeline Connections
