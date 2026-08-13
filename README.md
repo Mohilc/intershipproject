@@ -19,15 +19,18 @@
 
 ---
 
-## ⚡ Recent Optimization Updates (Version 2.5)
+## ⚡ Recent Optimization Updates (Version 2.6)
 
 To optimize low-latency tactical performance and network reliability in real-world SAR operations, the platform has been updated with several key features:
 
-- **Asynchronous YOLOv8 Frame Processing**: Refactored the live stream proxy (`/api/camera/stream_yolo`) to run inference on a dedicated background thread (`YOLOBackgroundWorker`). The main stream thread immediately overlays the latest available detections and yields frames at the camera's full framerate (**25–30 FPS**), rendering a stutter-free, real-time tactical feed.
-- **YOLOv8 Toggle Off-by-Default**: The live stream now connects in a clean raw optical state by default, bypassing YOLO processing to save CPU cycles. Operators can manually toggle the YOLO AI overlay when required.
-- **Stale State Reset on Disable**: When YOLO is toggled off, the backend immediately purges the active human tracking state from cache, resetting indicators in the dashboard without stale delays.
+- **YOLOv8 Toggle On-by-Default**: The live stream now initializes with the YOLO AI overlay enabled by default (`isYoloActive = true`) and styled indicators active, allowing immediate human detection upon startup.
+- **ESP32-CAM High-Framerate Transmissions**: Boosted camera clock frequency from 10MHz to 20MHz, optimized JPEG quality to 14, and reduced the FreeRTOS stream loop delay to 2ms to prevent watchdog resets and deliver maximum framerates.
+- **Self-Healing Stream Proxy**: Enhanced `/api/camera/stream_yolo` to fail back to OpenCV VideoCapture if the MJPEG stream drops, and automatically retry the connection every 5 seconds instead of yielding infinite diagnostic HUD frames when offline.
+- **Smart Sensory Fusion Logic**: Refined `/api/predict_fused` so that a clear camera stream (no human detected on surface) does not suppress valid subsurface radar detections, ensuring subsurface targets remain fully visible to operators.
+- **Asynchronous YOLOv8 Frame Processing**: Refactored the live stream proxy to run inference on a dedicated background thread (`YOLOBackgroundWorker`). The main stream thread immediately overlays the latest available detections and yields frames at the camera's full framerate (**25–30 FPS**), rendering a stutter-free, real-time tactical feed.
 - **Isolated Telemetry Route Mapping**: Standardized API routing on the client. Live sensor telemetry is queried directly from the ESP32 AP (`192.168.4.1` port 80), while high-workload Flask endpoints (predictions, StreamPETR) are routed to the PC host (`localhost:3000`), preventing micro-controller routing timeouts.
 - **Robust gzip Compression Filter**: Upgraded flask compression middleware to verify `Accept-Encoding: gzip` headers before compression, preventing data corruption on raw test clients and browser fetches.
+
 
 ---
 
