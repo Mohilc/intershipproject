@@ -250,6 +250,13 @@ class TerraSenseApp {
     const dot = document.getElementById('espCamDot');
 
     const btnYolo = document.getElementById('btnToggleYolo');
+    if (btnYolo) {
+      btnYolo.classList.add('active');
+      btnYolo.textContent = 'YOLO AI: ON';
+      btnYolo.style.background = 'var(--accent-emerald)';
+      btnYolo.style.color = '#040711';
+      btnYolo.style.fontWeight = '700';
+    }
     const yoloAlert = document.getElementById('espCamYoloAlert');
     const btnPinouts = document.getElementById('btnCamModelInfo');
     const modal = document.getElementById('camModelModal');
@@ -260,7 +267,7 @@ class TerraSenseApp {
 
     let flashOn = false;
     let isDemoMode = false;
-    let isYoloActive = false;
+    let isYoloActive = true;
     let yoloPollInterval = null;
     let lastDetectedState = false;
 

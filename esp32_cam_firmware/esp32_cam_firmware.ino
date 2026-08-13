@@ -226,7 +226,7 @@ static esp_err_t stream_handler(httpd_req_t *req) {
     }
     
     // Yield brief control to FreeRTOS to prevent Watchdog reset
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    vTaskDelay(2 / portTICK_PERIOD_MS);
   }
 
   Serial.println("[Camera] Client disconnected from stream.");
@@ -306,19 +306,19 @@ void setup() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;   // Fixed: was pin_sscb_scl (deprecated typo)
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 10000000;  // 10MHz (lower power draw for external power)
+  config.xclk_freq_hz = 20000000;  // 20MHz (high framerate)
   config.pixel_format = PIXFORMAT_JPEG;
   config.grab_mode = CAMERA_GRAB_LATEST; // Always grab the latest frame
   
   if (psramFound()) {
-    Serial.println("[Camera] PSRAM found — using VGA (640x480)");
+    Serial.println("[Camera] PSRAM found — using VGA (640x480) at high rate");
     config.frame_size = FRAMESIZE_VGA;
-    config.jpeg_quality = 12;
-    config.fb_count = 2;
+    config.jpeg_quality = 14;      // Optimized for high speed transmission (quality 10-63, lower is better)
+    config.fb_count = 2;           // Double buffering
   } else {
     Serial.println("[Camera] No PSRAM — using CIF (352x288)");
     config.frame_size = FRAMESIZE_CIF;
-    config.jpeg_quality = 12;
+    config.jpeg_quality = 14;
     config.fb_count = 1;
   }
 

@@ -533,139 +533,240 @@ def stream_yolo():
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
             
-            # 1. Handle Local PC Webcam
-            if target_url.lower() in ('webcam', '0', 'camera', 'local', 'local_cam'):
-                cap = None
-                try:
-                    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-                    if not cap.isOpened():
-                        cap = cv2.VideoCapture(0)
-                    
-                    if not cap.isOpened():
-                        print("[Server] Local webcam could not be opened.")
+            # Outer auto-reconnection loop for ESP32-CAM and webcams
+            while True:
+                # 1. Handle Local PC Webcam
+                if target_url.lower() in ('webcam', '0', 'camera', 'local', 'local_cam'):
+                    cap = None
+                    try:
+                        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+                        if not cap.isOpened():
+                            cap = cv2.VideoCapture(0)
+                        
+                        if not cap.isOpened():
+                            print("[Server] Local webcam could not be opened.")
+                            yield from generate_demo()
+                            return
+                        
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        
+                        consecutive_failures = 0
+                        while True:
+                            ret, frame = cap.read()
+                            if not ret or frame is None:
+                                consecutive_failures += 1
+                                if consecutive_failures > 30:
+                                    print("[Server] Webcam frame read failures exceeded limit. Breaking webcam loop.")
+                                    break
+                                time.sleep(0.05)
+                                continue
+                            
+                            consecutive_failures = 0
+                            if enable_yolo and yolo_worker:
+                                yolo_worker.update_frame(frame)
+                                detected, conf, boxes = yolo_worker.get_results()
+                                frame = draw_detection_hud(frame, detected, conf, boxes)
+                                latest_camera_result = {
+                                    "human_detected": detected,
+                                    "confidence": float(conf),
+                                    "box_count": len(boxes),
+                                    "last_update": time.time(),
+                                    "source": "webcam"
+                                }
+                            else:
+                                cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                                latest_camera_result = {
+                                    "human_detected": False,
+                                    "confidence": 0.0,
+                                    "box_count": 0,
+                                    "last_update": time.time(),
+                                    "source": "webcam"
+                                }
+                            
+                            _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                            yield (b'--frame\r\n'
+                                   b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                    except Exception as e:
+                        print(f"[Server] Webcam stream error: {e}")
                         yield from generate_demo()
-                        return
-                    
-                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret or frame is None:
-                            time.sleep(0.05)
-                            continue
-                        
-                        if enable_yolo and yolo_worker:
-                            yolo_worker.update_frame(frame)
-                            detected, conf, boxes = yolo_worker.get_results()
-                            frame = draw_detection_hud(frame, detected, conf, boxes)
-                            latest_camera_result = {
-                                "human_detected": detected,
-                                "confidence": float(conf),
-                                "box_count": len(boxes),
-                                "last_update": time.time(),
-                                "source": "webcam"
-                            }
-                        else:
-                            cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
-                            latest_camera_result = {
-                                "human_detected": False,
-                                "confidence": 0.0,
-                                "box_count": 0,
-                                "last_update": time.time(),
-                                "source": "webcam"
-                            }
-                        
-                        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                except Exception as e:
-                    print(f"[Server] Webcam stream error: {e}")
+                    finally:
+                        if cap is not None and cap.isOpened():
+                            cap.release()
+                    return
+
+                if not target_url or target_url.lower() in ('demo', 'synthetic', 'test'):
                     yield from generate_demo()
-                finally:
-                    if cap is not None and cap.isOpened():
-                        cap.release()
-                return
+                    return
 
-            if not target_url or target_url.lower() in ('demo', 'synthetic', 'test'):
-                yield from generate_demo()
-                return
+                # 2. Build candidate stream URLs for ESP32-CAM / IP Camera
+                clean_url = target_url.strip()
+                if not clean_url.startswith(('http://', 'https://', 'rtsp://')):
+                    clean_url = 'http://' + clean_url
 
-            # 2. Build candidate stream URLs for ESP32-CAM / IP Camera
-            clean_url = target_url.strip()
-            if not clean_url.startswith(('http://', 'https://', 'rtsp://')):
-                clean_url = 'http://' + clean_url
+                # Generate candidates to probe
+                candidates = [clean_url]
+                
+                # If user entered raw IP/host or just port, try common stream paths
+                base_no_slash = clean_url.rstrip('/')
+                if not any(base_no_slash.endswith(p) for p in ['/stream', '/video', '/capture', '/shot.jpg', '/mjpeg', '/live']):
+                    candidates.append(base_no_slash + '/stream')
+                    # Check port 81 (standard Arduino ESP32 CameraWebServer stream port)
+                    if ':81' not in base_no_slash:
+                        if ':80' in base_no_slash:
+                            candidates.append(base_no_slash.replace(':80', ':81') + '/stream')
+                        else:
+                            try:
+                                from urllib.parse import urlparse
+                                parsed = urlparse(base_no_slash)
+                                host_only = parsed.hostname or base_no_slash.replace('http://', '').replace('https://', '').split('/')[0]
+                                candidates.append(f"http://{host_only}:81/stream")
+                            except Exception:
+                                pass
+                    candidates.append(base_no_slash + '/video')
+                    candidates.append(base_no_slash + '/capture')
+                    candidates.append(base_no_slash + '/shot.jpg')
 
-            # Generate candidates to probe
-            candidates = [clean_url]
-            
-            # If user entered raw IP/host or just port, try common stream paths
-            base_no_slash = clean_url.rstrip('/')
-            if not any(base_no_slash.endswith(p) for p in ['/stream', '/video', '/capture', '/shot.jpg', '/mjpeg', '/live']):
-                candidates.append(base_no_slash + '/stream')
-                # Check port 81 (standard Arduino ESP32 CameraWebServer stream port)
-                if ':81' not in base_no_slash:
-                    if ':80' in base_no_slash:
-                        candidates.append(base_no_slash.replace(':80', ':81') + '/stream')
-                    else:
+                # Try to connect to candidate stream
+                headers = {
+                    'User-Agent': 'TerraSense-AI-Proxy/2.0',
+                    'Accept': '*/*'
+                }
+                
+                stream_resp = None
+                active_url = None
+                is_snapshot_endpoint = False
+
+                for cand in candidates:
+                    try:
+                        r = requests.get(cand, stream=True, timeout=(2.5, 8.0), headers=headers)
+                        if r.status_code == 200:
+                            c_type = r.headers.get('Content-Type', '').lower()
+                            if 'multipart' in c_type or 'mixed-replace' in c_type or 'octet-stream' in c_type or 'video' in c_type:
+                                stream_resp = r
+                                active_url = cand
+                                is_snapshot_endpoint = False
+                                print(f"[Server] Connected to MJPEG stream at: {active_url}")
+                                break
+                            elif 'image/' in c_type:
+                                # Single JPEG capture endpoint (e.g. /capture or /shot.jpg)
+                                stream_resp = r
+                                active_url = cand
+                                is_snapshot_endpoint = True
+                                print(f"[Server] Connected to snapshot endpoint at: {active_url}")
+                                break
+                    except Exception:
+                        continue
+
+                # Strategy 2A: Continuous Snapshot Polling Loop (for /capture endpoints)
+                if is_snapshot_endpoint and active_url:
+                    # Close the probing connection first to avoid socket leak
+                    if stream_resp is not None:
                         try:
-                            from urllib.parse import urlparse
-                            parsed = urlparse(base_no_slash)
-                            host_only = parsed.hostname or base_no_slash.replace('http://', '').replace('https://', '').split('/')[0]
-                            candidates.append(f"http://{host_only}:81/stream")
+                            stream_resp.close()
                         except Exception:
                             pass
-                candidates.append(base_no_slash + '/video')
-                candidates.append(base_no_slash + '/capture')
-                candidates.append(base_no_slash + '/shot.jpg')
-
-            # Try to connect to candidate stream
-            headers = {
-                'User-Agent': 'TerraSense-AI-Proxy/2.0',
-                'Accept': '*/*'
-            }
-            
-            stream_resp = None
-            active_url = None
-            is_snapshot_endpoint = False
-
-            for cand in candidates:
-                try:
-                    r = requests.get(cand, stream=True, timeout=(2.5, 8.0), headers=headers)
-                    if r.status_code == 200:
-                        c_type = r.headers.get('Content-Type', '').lower()
-                        if 'multipart' in c_type or 'mixed-replace' in c_type or 'octet-stream' in c_type or 'video' in c_type:
-                            stream_resp = r
-                            active_url = cand
-                            is_snapshot_endpoint = False
-                            print(f"[Server] Connected to MJPEG stream at: {active_url}")
-                            break
-                        elif 'image/' in c_type:
-                            # Single JPEG capture endpoint (e.g. /capture or /shot.jpg)
-                            stream_resp = r
-                            active_url = cand
-                            is_snapshot_endpoint = True
-                            print(f"[Server] Connected to snapshot endpoint at: {active_url}")
-                            break
-                except Exception:
-                    continue
-
-            # Strategy 2A: Continuous Snapshot Polling Loop (for /capture endpoints)
-            if is_snapshot_endpoint and active_url:
-                # Close the probing connection first to avoid socket leak
-                if stream_resp is not None:
-                    try:
-                        stream_resp.close()
-                    except Exception:
-                        pass
-                frame_idx = 0
-                while True:
-                    try:
-                        resp = requests.get(active_url, timeout=3.0, headers=headers)
+                    
+                    consecutive_failures = 0
+                    frame_idx = 0
+                    while True:
                         try:
-                            if resp.status_code == 200:
-                                np_arr = np.frombuffer(resp.content, dtype=np.uint8)
+                            resp = requests.get(active_url, timeout=3.0, headers=headers)
+                            try:
+                                if resp.status_code == 200:
+                                    np_arr = np.frombuffer(resp.content, dtype=np.uint8)
+                                    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                                    if frame is not None:
+                                        consecutive_failures = 0
+                                        if enable_yolo and yolo_worker:
+                                            yolo_worker.update_frame(frame)
+                                            detected, conf, boxes = yolo_worker.get_results()
+                                            frame = draw_detection_hud(frame, detected, conf, boxes)
+                                            latest_camera_result = {
+                                                "human_detected": detected,
+                                                "confidence": float(conf),
+                                                "box_count": len(boxes),
+                                                "last_update": time.time(),
+                                                "source": "esp32_cam"
+                                            }
+                                        else:
+                                            cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
+                                            latest_camera_result = {
+                                                "human_detected": False,
+                                                "confidence": 0.0,
+                                                "box_count": 0,
+                                                "last_update": time.time(),
+                                                "source": "esp32_cam"
+                                            }
+
+                                        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+                                        yield (b'--frame\r\n'
+                                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                                    else:
+                                        consecutive_failures += 1
+                                else:
+                                    consecutive_failures += 1
+                            finally:
+                                try:
+                                    resp.close()
+                                except Exception:
+                                    pass
+                            
+                            if consecutive_failures > 15:
+                                print("[Server] Snapshot poll consecutive failures exceeded limit. Breaking poll loop.")
+                                break
+                                
+                            time.sleep(0.06)
+                            frame_idx += 1
+                        except Exception as snap_err:
+                            print(f"[Server] Snapshot poll error: {snap_err}")
+                            consecutive_failures += 1
+                            if consecutive_failures > 15:
+                                break
+                            time.sleep(0.5)
+
+                # Strategy 2B: MJPEG Streaming with Frame Buffering
+                elif stream_resp is not None and not is_snapshot_endpoint:
+                    byte_data = b''
+                    try:
+                        for chunk in stream_resp.iter_content(chunk_size=4096):
+                            if not chunk:
+                                continue
+                            byte_data += chunk
+                            
+                            while True:
+                                a = byte_data.find(b'\xff\xd8')
+                                if a == -1:
+                                    if len(byte_data) > 8192:
+                                        byte_data = byte_data[-2048:]
+                                    break
+                                
+                                b = byte_data.find(b'\xff\xd9', a + 2)
+                                if b == -1:
+                                    # If buffer is excessively large without EOI, drop corrupted data
+                                    if len(byte_data) - a > 131072:
+                                        next_a = byte_data.find(b'\xff\xd8', a + 2)
+                                        if next_a != -1:
+                                            byte_data = byte_data[next_a:]
+                                        else:
+                                            byte_data = byte_data[-4096:]
+                                    break
+                                
+                                jpg = byte_data[a:b+2]
+                                byte_data = byte_data[b+2:]
+                                
+                                # Frame-skipping: if buffer has accumulated backlogged frames, jump to latest
+                                if len(byte_data) > 32768:
+                                    last_a = byte_data.rfind(b'\xff\xd8')
+                                    if last_a > 0:
+                                        last_b = byte_data.find(b'\xff\xd9', last_a + 2)
+                                        if last_b != -1:
+                                            jpg = byte_data[last_a:last_b+2]
+                                            byte_data = byte_data[last_b+2:]
+                                
+                                np_arr = np.frombuffer(jpg, dtype=np.uint8)
                                 frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                                
                                 if frame is not None:
                                     if enable_yolo and yolo_worker:
                                         yolo_worker.update_frame(frame)
@@ -687,65 +788,36 @@ def stream_yolo():
                                             "last_update": time.time(),
                                             "source": "esp32_cam"
                                         }
-
+                                    
                                     _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
                                     yield (b'--frame\r\n'
                                            b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                        finally:
-                            try:
-                                resp.close()
-                            except Exception:
-                                pass
-                        time.sleep(0.06)
-                        frame_idx += 1
-                    except Exception as snap_err:
-                        print(f"[Server] Snapshot poll error: {snap_err}")
-                        time.sleep(0.5)
-                return
+                    except Exception as stream_err:
+                        print(f"[Server] MJPEG stream reading interrupted: {stream_err}")
+                    finally:
+                        try:
+                            stream_resp.close()
+                        except Exception:
+                            pass
 
-            # Strategy 2B: MJPEG Streaming with Frame Buffering
-            if stream_resp is not None and not is_snapshot_endpoint:
-                byte_data = b''
-                try:
-                    for chunk in stream_resp.iter_content(chunk_size=4096):
-                        if not chunk:
-                            continue
-                        byte_data += chunk
-                        
-                        while True:
-                            a = byte_data.find(b'\xff\xd8')
-                            if a == -1:
-                                if len(byte_data) > 8192:
-                                    byte_data = byte_data[-2048:]
-                                break
-                            
-                            b = byte_data.find(b'\xff\xd9', a + 2)
-                            if b == -1:
-                                # If buffer is excessively large without EOI, drop corrupted data
-                                if len(byte_data) - a > 131072:
-                                    next_a = byte_data.find(b'\xff\xd8', a + 2)
-                                    if next_a != -1:
-                                        byte_data = byte_data[next_a:]
-                                    else:
-                                        byte_data = byte_data[-4096:]
-                                break
-                            
-                            jpg = byte_data[a:b+2]
-                            byte_data = byte_data[b+2:]
-                            
-                            # Frame-skipping: if buffer has accumulated backlogged frames, jump to latest
-                            if len(byte_data) > 32768:
-                                last_a = byte_data.rfind(b'\xff\xd8')
-                                if last_a > 0:
-                                    last_b = byte_data.find(b'\xff\xd9', last_a + 2)
-                                    if last_b != -1:
-                                        jpg = byte_data[last_a:last_b+2]
-                                        byte_data = byte_data[last_b+2:]
-                            
-                            np_arr = np.frombuffer(jpg, dtype=np.uint8)
-                            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-                            
-                            if frame is not None:
+                # Strategy 2C: Fallback to OpenCV VideoCapture (handles RTSP, non-standard HTTP, etc.)
+                else:
+                    try:
+                        print(f"[Server] Attempting OpenCV VideoCapture on: {clean_url}")
+                        cap = cv2.VideoCapture(clean_url)
+                        if cap.isOpened():
+                            consecutive_failures = 0
+                            while True:
+                                ret, frame = cap.read()
+                                if not ret or frame is None:
+                                    consecutive_failures += 1
+                                    if consecutive_failures > 30:
+                                        print("[Server] VideoCapture frame read failures exceeded limit. Breaking fallback loop.")
+                                        break
+                                    time.sleep(0.05)
+                                    continue
+                                
+                                consecutive_failures = 0
                                 if enable_yolo and yolo_worker:
                                     yolo_worker.update_frame(frame)
                                     detected, conf, boxes = yolo_worker.get_results()
@@ -766,76 +838,32 @@ def stream_yolo():
                                         "last_update": time.time(),
                                         "source": "esp32_cam"
                                     }
-                                
+
                                 _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
                                 yield (b'--frame\r\n'
                                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                except Exception as stream_err:
-                    print(f"[Server] MJPEG stream reading interrupted: {stream_err}")
-                finally:
-                    try:
-                        stream_resp.close()
-                    except Exception:
-                        pass
+                    except Exception as cap_err:
+                        print(f"[Server] VideoCapture fallback error: {cap_err}")
 
-            # Strategy 2C: Fallback to OpenCV VideoCapture (handles RTSP, non-standard HTTP, etc.)
-            try:
-                print(f"[Server] Attempting OpenCV VideoCapture on: {clean_url}")
-                cap = cv2.VideoCapture(clean_url)
-                if cap.isOpened():
-                    while True:
-                        ret, frame = cap.read()
-                        if not ret or frame is None:
-                            time.sleep(0.05)
-                            continue
-                        if enable_yolo and yolo_worker:
-                            yolo_worker.update_frame(frame)
-                            detected, conf, boxes = yolo_worker.get_results()
-                            frame = draw_detection_hud(frame, detected, conf, boxes)
-                            latest_camera_result = {
-                                "human_detected": detected,
-                                "confidence": float(conf),
-                                "box_count": len(boxes),
-                                "last_update": time.time(),
-                                "source": "esp32_cam"
-                            }
-                        else:
-                            cv2.putText(frame, "OPTICAL FEED (RAW)", (12, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 242, 254), 1, cv2.LINE_AA)
-                            latest_camera_result = {
-                                "human_detected": False,
-                                "confidence": 0.0,
-                                "box_count": 0,
-                                "last_update": time.time(),
-                                "source": "esp32_cam"
-                            }
-
-                        _, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                        yield (b'--frame\r\n'
-                               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-            except Exception as cap_err:
-                print(f"[Server] VideoCapture fallback error: {cap_err}")
-
-            # Strategy 2D: Camera is unreachable — yield informative diagnostic HUD frames
-            print(f"[Server] Camera node unreachable at: {clean_url}")
-            diag_frame_idx = 0
-            details = [
-                f"TARGET URL: {clean_url}",
-                "⚠ 1. Ensure ESP32-CAM is powered ON (5V / GND)",
-                "⚠ 2. Connect PC WiFi to 'TERRA-SENSE-ESP32' Hotspot",
-                "⚠ 3. Standard stream endpoint is: 192.168.4.2/stream",
-                "✓ Retrying connection automatically..."
-            ]
-            while True:
-                diag_frame_idx += 1
-                diag_jpg = create_diagnostic_frame(
-                    title="CAMERA NODE OFFLINE / UNREACHABLE",
-                    subtitle="SEARCH & RESCUE OPTICAL SENSOR LINK FAILED",
-                    details=details,
-                    frame_idx=diag_frame_idx
-                )
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + diag_jpg + b'\r\n')
-                time.sleep(1.0)
+                # Strategy 2D: Camera is unreachable — yield informative diagnostic HUD frames for 5 seconds
+                print(f"[Server] Camera node unreachable at: {clean_url}. Yielding diagnostics and retrying...")
+                details = [
+                    f"TARGET URL: {clean_url}",
+                    "⚠ 1. Ensure ESP32-CAM is powered ON (5V / GND)",
+                    "⚠ 2. Connect PC WiFi to 'TERRA-SENSE-ESP32' Hotspot",
+                    "⚠ 3. Standard stream endpoint is: 192.168.4.2/stream",
+                    "✓ Retrying connection automatically..."
+                ]
+                for diag_frame_idx in range(1, 6): # 5 seconds of diagnostics
+                    diag_jpg = create_diagnostic_frame(
+                        title="CAMERA NODE OFFLINE / UNREACHABLE",
+                        subtitle="SEARCH & RESCUE OPTICAL SENSOR LINK FAILED",
+                        details=details,
+                        frame_idx=diag_frame_idx
+                    )
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + diag_jpg + b'\r\n')
+                    time.sleep(1.0)
         finally:
             if yolo_worker is not None:
                 try:
@@ -1142,11 +1170,17 @@ def predict_fused():
 
             # Weighted fusion
             if fusion_applied:
-                # Camera seeing a person above ground raises the fused score;
-                # camera clear lowers it (pushes false positives down).
-                cam_score_norm = cam_conf_override if cam_human_override else (1.0 - cam_conf_override) * 0.1
-                fused_prob = (ml_prob * ML_WEIGHT) + (cam_score_norm * 100.0 * CAMERA_WEIGHT)
-                fused_prob = round(min(99.8, max(0.2, fused_prob)), 1)
+                if cam_human_override:
+                    # Camera seeing a person above ground raises/boosts the fused score
+                    fused_prob = (ml_prob * ML_WEIGHT) + (cam_conf_override * 100.0 * CAMERA_WEIGHT)
+                    if cam_conf_override >= 0.50:
+                        # Ensure fused probability is at least above the threshold if camera is confident
+                        fused_prob = max(fused_prob, cam_conf_override * 100.0)
+                    fused_prob = round(min(99.8, max(0.2, fused_prob)), 1)
+                else:
+                    # Camera clear (does not see anyone above ground).
+                    # This should NOT suppress a subsurface radar detection.
+                    fused_prob = ml_prob
             else:
                 fused_prob = ml_prob
 
